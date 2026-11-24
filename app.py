@@ -11813,7 +11813,7 @@ def _nome_base_transcricao(job: Dict[str, Any]) -> str:
 
 
 import transcrever_lote as _transcrever_lote  # noqa: E402  (📦 v84_464: lote do YouTube vindo do script)
-_transcrever_lote.registrar(app, TRANSCRICOES_AVULSAS_DIR)
+_transcrever_lote.registrar(app, TRANSCRICOES_AVULSAS_DIR, BASE_DIR)
 
 
 @app.route("/transcrever/<job_id>/feito", methods=["POST"])

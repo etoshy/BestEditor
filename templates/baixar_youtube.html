@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block title %}Baixar do YouTube{% endblock %}
+{% block content %}
+<h1>⬇ Baixar do YouTube</h1>
+<p style="color:#666;">Vários vídeos de uma vez, em <b>MP4</b> ou <b>MP3</b>, tudo num .zip. A transcrição é opcional: o site abre cada
+vídeo no navegador do site e você clica no botão <b>📄 Salvar transcrição no .zip</b> — vídeo em que você não clicar fica sem transcrição.</p>
+
+<label>Links do YouTube <span style="font-weight:400;color:#666">(um por linha — vídeo, shorts ou youtu.be)</span></label>
+<textarea id="byLinks" rows="7" placeholder="https://www.youtube.com/watch?v=...&#10;https://youtu.be/..."></textarea>
+<div id="byConta" style="font-size:.85rem;color:#555"></div>
+
+<div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end;margin-top:8px">
+  <div><label>Formato</label>
+    <select id="byFormato" style="width:auto">
+      <option value="mp4">🎬 MP4 (vídeo)</option>
+      <option value="mp3">🎵 MP3 (só o som, 320 kbps)</option>
+    </select></div>
+  <div id="byQualBox"><label>Qualidade do vídeo</label>
+    <select id="byQual" style="width:auto"><option>1080p</option><option>720p</option><option>480p</option><option>360p</option><option value="melhor">melhor que tiver</option></select></div>
+  <label style="font-weight:400;display:flex;gap:6px;align-items:center;margin:0 0 8px"><input type="checkbox" id="byTrans" style="width:auto;margin:0"> 📄 também quero a transcrição (eu clico em cada guia)</label>
+</div>
+<button type="button" id="byIr" style="width:auto">⬇ Baixar</button> <span id="bySt" style="color:#555"></span>
+
+<div id="byLotes" style="margin-top:20px"></div>
+
+<details style="margin-top:16px;font-size:.85rem;color:#555"><summary>Como funciona a transcrição</summary>
+<ol>
+  <li>Precisa do script <b>"YouTube — Copiar / Baixar Transcrição"</b> (1.5 ou mais novo) no navegador do site —
+      <a href="/navegador-imagens/instalar" target="_blank">⚙ instalar/atualizar</a> (o mesmo Brave das imagens do Google).</li>
+  <li>Clique em <b>🧲 Abrir as próximas 5 guias</b>: cada guia é um vídeo da lista.</li>
+  <li>Em cada guia, clique no botão azul <b>📄 Salvar transcrição no .zip</b> (canto de baixo). Pronto: a transcrição vem pra cá com o
+      MESMO nome do vídeo (Título.mp4 + Título.txt + Título (com timestamps).txt). Não quer a de algum? É só não clicar.</li>
+  <li>O download dos vídeos não espera: ele vai rodando, um de cada vez. O <b>⬇ .zip</b> sempre sai com o que já tem.</li>
+</ol>
+Se o Brave perguntar se o youtube.com pode acessar a rede local, permita (é o site no seu PC).</details>
+
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+  const esc = (t) => String(t == null ? '' : t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const ids = (t) => [...new Set((String(t).match(/(?:v=|youtu\.be\/|shorts\/|live\/)([\w-]{11})/g) || []).map((x) => x.slice(-11)))];
+  const api = async (url, body) => { const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) });
+    const d = await r.json().catch(() => ({})); if (!r.ok || d.erro) throw new Error(d.erro || r.status); return d; };
+  try { const p = JSON.parse(localStorage.getItem('baixar_yt') || '{}'); if (p.formato) $('byFormato').value = p.formato; if (p.qual) $('byQual').value = p.qual; $('byTrans').checked = !!p.trans; } catch (e) {}
+  const guardar = () => { try { localStorage.setItem('baixar_yt', JSON.stringify({ formato: $('byFormato').value, qual: $('byQual').value, trans: $('byTrans').checked })); } catch (e) {} };
+  const sync = () => { $('byQualBox').style.display = $('byFormato').value === 'mp4' ? '' : 'none'; guardar(); };
+  $('byFormato').addEventListener('change', sync); $('byQual').addEventListener('change', guardar); $('byTrans').addEventListener('change', guardar); sync();
+  $('byLinks').addEventListener('input', () => { const n = ids($('byLinks').value).length; $('byConta').textContent = n ? n + ' vídeo(s)' : ''; });
+  $('byIr').addEventListener('click', async () => {
+    $('byIr').disabled = true; $('bySt').textContent = 'começando…';
+    try {
+      const d = await api('/baixar-youtube/novo', { links: $('byLinks').value, formato: $('byFormato').value, qualidade: $('byQual').value, transcricao: $('byTrans').checked });
+      $('bySt').textContent = '✔ baixando — acompanhe abaixo'; $('byLinks').value = ''; $('byConta').textContent = '';
+      if ($('byTrans').checked) { try { await api(`/baixar-youtube/${d.lote.id}/guias`, { quantas: 5 }); } catch (e) { $('bySt').textContent = '✔ baixando · ⚠ guias: ' + e.message; } }
+      desenhar();
+    } catch (e) { $('bySt').textContent = '⚠ ' + e.message; } finally { $('byIr').disabled = false; }
+  });
+  async function desenhar() {
+    let d; try { d = await (await fetch('/transcrever/lotes')).json(); } catch (e) { return; }
+    const L = (d.lotes || []).filter((l) => l.modo === 'mp4' || l.modo === 'mp3');
+    $('byLotes').innerHTML = L.length ? '<h2 style="margin:0 0 6px">📦 Downloads</h2>' + L.map((l) => {
+      const comT = l.itens.filter((i) => i.transcricao_ok).length, rod = l.estado === 'baixando' || l.estado === 'na_fila';
+      return `<div style="border:1px solid #e5e7eb;border-radius:8px;padding:8px 12px;margin-bottom:8px;font-size:.88rem">
+        <b>${l.modo === 'mp3' ? '🎵 MP3' : '🎬 MP4' + (l.qualidade ? ' ' + esc(l.qualidade) : '')}</b> · ${new Date(l.criado * 1000).toLocaleString('pt-BR')} ·
+        ${l.prontos} de ${l.total} baixados · 📄 ${comT} com transcrição
+        ${rod ? `· ⏳ ${l.estado === 'na_fila' ? 'na fila' : 'baixando'} <button type="button" data-parar="${l.id}" style="width:auto;margin:0;padding:1px 8px;font-size:.78rem">⏹ parar</button>` : l.estado === 'pronto' ? '· ✅ pronto' : '· ⚠ ' + esc(l.estado)}
+        <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">
+          <a href="/transcrever/lote/${l.id}/zip"><button type="button" style="width:auto;margin:0;padding:3px 10px;font-size:.82rem">⬇ .zip${rod ? ' (o que já tem)' : ''}</button></a>
+          ${comT < l.total ? `<button type="button" data-guias="${l.id}" style="width:auto;margin:0;padding:3px 10px;font-size:.82rem;background:#2563eb">🧲 Abrir as próximas 5 guias (transcrição)</button>
+            <button type="button" data-guias="${l.id}" data-denovo="1" style="width:auto;margin:0;padding:3px 10px;font-size:.82rem;background:#64748b" title="reabre também as que você já abriu e não clicou">↺ reabrir as sem transcrição</button>` : ''}
+        </div>
+        <details style="margin-top:4px"><summary style="font-size:.8rem;color:#555">vídeos</summary>${l.itens.map((i) => `<div style="font-size:.8rem;padding:2px 0">
+          ${i.estado === 'pronto' ? '✔' : i.estado === 'baixando' ? '⏳' : i.erro ? '✖' : '·'} ${esc(i.titulo || i.url)}
+          ${i.transcricao_ok ? ' <span style="color:#15803d">📄</span>' : i.guia === 'aberta' ? ' <span style="color:#b45309">(guia aberta)</span>' : ''}
+          ${i.erro ? `<span style="color:#b91c1c"> — ${esc(String(i.erro).slice(0, 160))}</span>` : ''}</div>`).join('')}</details></div>`;
+    }).join('') : '';
+    $('byLotes').querySelectorAll('[data-parar]').forEach((b) => b.addEventListener('click', () => api(`/transcrever/lote/${b.dataset.parar}/parar`).then(desenhar)));
+    $('byLotes').querySelectorAll('[data-guias]').forEach((b) => b.addEventListener('click', async () => {
+      b.disabled = true;
+      try { const r = await api(`/baixar-youtube/${b.dataset.guias}/guias`, { quantas: 5, de_novo: !!b.dataset.denovo }); $('bySt').textContent = `🧲 ${r.abertas} guia(s) abertas no navegador do site`; }
+      catch (e) { $('bySt').textContent = '⚠ ' + e.message; } finally { b.disabled = false; desenhar(); }
+    }));
+    clearTimeout(desenhar._t);
+    desenhar._t = setTimeout(desenhar, L.some((l) => l.estado === 'baixando' || l.estado === 'na_fila' || l.itens.some((i) => i.guia === 'aberta')) ? 3000 : 15000);
+  }
+  desenhar();
+})();
+</script>
+{% endblock %}

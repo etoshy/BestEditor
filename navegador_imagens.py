@@ -296,7 +296,7 @@ Se não abrir: no ícone da extensão → <b>Criar/Adicionar novo script</b>, ap
 <p>Botão <b>📄 Transcrição</b> nos vídeos e <b>📦 Transcrições</b> nas playlists/canais: várias transcrições de uma vez num .zip.
 Instala na MESMA extensão: clique em <a href="/navegador-imagens/youtube-transcricao.user.js"><b>instalar o script do YouTube</b></a>
 (se não abrir: Criar novo script → cole o código de <a href="/navegador-imagens/youtube-transcricao.user.js" target="_blank">aqui</a> → salvar).
-Se você já tinha a versão 1.2 ou 1.3, substitua pela 1.4 (é ela que manda os vídeos/áudios pro site baixar).</p></body>"""
+Se você já tinha uma versão anterior, substitua pela 1.5 (é ela que tem o botão 📄 Salvar transcrição no .zip da aba ⬇ Baixar do YouTube).</p></body>"""
         return Response(pag, mimetype="text/html; charset=utf-8")
 
     @app.route("/navegador-imagens/estado")

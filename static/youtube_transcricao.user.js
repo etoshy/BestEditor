@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YouTube - Copiar / Baixar Transcrição
 // @namespace    https://github.com/local/yt-transcricao
-// @version      1.4.0
+// @version      1.5.0
 // @description  Botão ao lado do Like que abre a transcrição e permite copiar ou baixar (.txt), com ou sem timestamps. 📦 Lote: várias transcrições num .zip.
 // @match        https://www.youtube.com/*
 // @run-at       document-idle
@@ -789,6 +789,60 @@
     }
   }
 
+  // ⬇ v1.5: guia aberta pela aba "Baixar do YouTube" do site (#bestyt=site|lote|índice) → botão "Salvar transcrição no .zip"
+  const ALVO_KEY = 'yt-tt-bestyt';
+  (function lerAlvo() {
+    const m = location.hash.match(/bestyt=([^&]+)/);
+    if (!m) return;
+    const [site, lote, idx] = decodeURIComponent(m[1]).split('|');
+    const id = videoIdOf(location.href);
+    if (!site || !lote || !id) return;
+    try { sessionStorage.setItem(ALVO_KEY, JSON.stringify({ site, lote, idx: +idx, id })); } catch (e) { /* ignora */ }
+  })();
+  function alvoAtual() {
+    try { const a = JSON.parse(sessionStorage.getItem(ALVO_KEY) || 'null'); return a && a.id === videoIdOf(location.href) ? a : null; }
+    catch (e) { return null; }
+  }
+  async function salvarNoLote(btn) {
+    const a = alvoAtual();
+    if (!a) return;
+    btn.disabled = true; btn.textContent = '⏳ pegando a transcrição…';
+    let r = null;
+    try { r = await transcriptOf(a.id, (cfg('HL') || 'pt').slice(0, 2)); } catch (e) { /* tenta pela tela */ }
+    if (!r) {
+      const segs = await ensureTranscriptOpen();
+      if (segs && segs.length) r = { title: videoTitle(), channel: '', segs, fonte: 'transcrição' };
+    }
+    if (!r) { btn.disabled = false; btn.textContent = '✖ sem transcrição neste vídeo — clique pra tentar de novo'; return; }
+    btn.textContent = '📤 mandando pro site…';
+    try {
+      const res = await fetch(a.site.replace(/\/$/, '') + `/baixar-youtube/${a.lote}/transcricao`, { method: 'POST', headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify({ idx: a.idx, titulo: r.title, canal: r.channel, fonte: r.fonte, txt: buildText(r.segs, false), txt_ts: buildText(r.segs, true) }) });
+      const d = await res.json();
+      if (!res.ok || d.erro) throw new Error(d.erro || ('HTTP ' + res.status));
+      btn.textContent = '✔ transcrição salva no .zip — pode fechar a guia';
+      btn.style.background = '#16a34a';
+      try { sessionStorage.removeItem(ALVO_KEY); } catch (e) { /* ignora */ }
+      setTimeout(() => { try { window.close(); } catch (e) { /* ignora */ } }, 1500);
+    } catch (e) {
+      btn.disabled = false;
+      btn.textContent = '✖ o site não respondeu (está aberto? permita a rede local) — tentar de novo';
+    }
+  }
+  function injectLoteBtn() {
+    let b = document.getElementById('yt-tt-lote-btn');
+    const a = location.pathname.startsWith('/watch') ? alvoAtual() : null;
+    if (!a) { if (b) b.style.display = 'none'; return; }
+    if (!b) {
+      b = h('button', { id: 'yt-tt-lote-btn', type: 'button', title: 'manda a transcrição deste vídeo pro .zip da aba Baixar do YouTube' }, '📄 Salvar transcrição no .zip');
+      b.style.cssText = 'position:fixed;right:18px;bottom:70px;z-index:10000;padding:12px 18px;border:none;border-radius:22px;cursor:pointer;' +
+        'font:600 15px Roboto,Arial,sans-serif;background:#3ea6ff;color:#0f0f0f;box-shadow:0 4px 18px rgba(0,0,0,.45)';
+      b.addEventListener('click', () => salvarNoLote(b));
+      document.body.appendChild(b);
+    }
+    b.style.display = '';
+  }
+
   // botão flutuante fora da página de vídeo (playlist, canal, busca…)
   function injectFloating() {
     let f = document.getElementById('yt-tt-float');
@@ -929,9 +983,10 @@
     container.insertBefore(btn, container.firstChild);
   }
 
-  const obs = new MutationObserver(() => { inject(); injectFloating(); });
+  const obs = new MutationObserver(() => { inject(); injectFloating(); injectLoteBtn(); });
   obs.observe(document.body, { childList: true, subtree: true });
-  document.addEventListener('yt-navigate-finish', () => setTimeout(() => { inject(); injectFloating(); }, 300));
+  document.addEventListener('yt-navigate-finish', () => setTimeout(() => { inject(); injectFloating(); injectLoteBtn(); }, 300));
   inject();
   injectFloating();
+  injectLoteBtn();
 })();
