@@ -53,3 +53,11 @@ def test_v472_regras_sem_caso_especifico():
     tudo = tb.system_analise(a, "") + tb.system_notas(a, "") + tb.system_lapidar(a, {"titulo": "t"}) + tb.system_sem_historias(a)
     for w in ("cigarro", "fumar", "corrida", "bronquite"):
         assert w not in tudo.lower()
+
+
+def test_v473_completar_proprios():
+    import dossies as ds
+    assert any("exemplos NOVOS" in r for r in ds.REGRAS_COMPLETAR_PROPRIOS)
+    import inspect, temas_bruto_rotas
+    src = inspect.getsource(temas_bruto_rotas)
+    assert "_completar_tamanho(aid, tid, pid, t)" in src and "prompt-completar" in src

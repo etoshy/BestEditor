@@ -101,6 +101,7 @@ def registrar(app, base_dir: str) -> None:
             rot = ((p.get("resultado") or {}).get("roteiro") or "").strip()
             if not rot:
                 raise RuntimeError("a IA não devolveu o roteiro")
+            _completar_tamanho(aid, tid, pid, t)
             if revisar and not t.get("revisado"):
                 _estado(aid, tid, "revisao", "🪄 revisão + 🎙 adaptando pro TTS…")
                 try:
@@ -116,6 +117,33 @@ def registrar(app, base_dir: str) -> None:
             _estado(aid, tid, "pronto", f"✅ roteiro pronto: {palavras} palavras (~{max(1, round(palavras / 150))} min)")
         except Exception as exc:  # noqa: BLE001
             _estado(aid, tid, "erro", f"❌ {exc}")
+
+    def _completar_tamanho(aid: str, tid: str, pid: str, t: Dict[str, Any]) -> None:
+        """📏 v84_473: roteiro bem abaixo dos minutos pedidos (ex.: 8 de 30 min) = raso. A IA completa sozinha até o
+        tamanho (no máx. 2 vezes) — antes só aparecia o aviso e o botão "📏 Prompt pra completar"."""
+        import metodo_roteiro
+        for vez in (1, 2):
+            p = ds.carregar(base_dir, pid)
+            minutos, alvo, _ppm = ds.alvo_tamanho(p)
+            res = p.get("resultado") or {}
+            tem = metodo_roteiro.palavras_do_texto(res.get("roteiro_final") or res.get("roteiro") or "")
+            if minutos <= 1 or not alvo or tem >= alvo * metodo_roteiro.TOLERANCIA_TAMANHO:
+                return
+            _estado(aid, tid, "roteiro", f"📏 o roteiro ficou curto ({tem} de ~{alvo} palavras) — a IA está aprofundando "
+                                         f"({vez}/2)…")
+            try:
+                pr = _post(f"/modelos-video/{pid}/prompt-completar")["prompt"]
+                fonte = "\n\n".join(str(f.get("texto") or "") for f in p.get("fontes") or []
+                                     if "notas_" in str(f.get("arquivo")) or "bruto_" in str(f.get("arquivo"))).strip()
+                if fonte:  # conversa nova: a IA recebe de novo a fonte (as ideias) pra aprofundar com base nela
+                    pr += "\n\n## Fonte (as ideias do vídeo)\n" + fonte[:60000]
+                resp = _post("/ia/gerar", {"prompt": pr, "titulo": "Completar: " + t["titulo"][:80]})
+                novo = str(resp.get("texto") or "")
+                if len(novo.split()) <= tem:
+                    return
+                _post(f"/modelos-video/{pid}/resultado", {"texto": novo})
+            except Exception:  # noqa: BLE001 — o roteiro curto continua valendo (dá pra completar à mão)
+                return
 
     def _existe(pid: str) -> bool:
         try:

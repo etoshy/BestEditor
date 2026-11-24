@@ -1723,7 +1723,22 @@ def prompt_completar(p: Dict[str, Any]) -> str:
     return metodo_roteiro.prompt_completar(
         res["roteiro"], metodo_roteiro.palavras_do_texto(res.get("roteiro_final") or res["roteiro"]), alvo, minutos,
         [c.get("comeca_em") for c in res.get("capitulos") or [] if c.get("comeca_em")],
-        idiomas.nome_para_prompt(idiomas.normalizar(cfg.get("idioma")) or "pt"))
+        idiomas.nome_para_prompt(idiomas.normalizar(cfg.get("idioma")) or "pt"),
+        regras_extra=REGRAS_COMPLETAR_PROPRIOS if (MODELOS.get(cfg.get("modelo")) or {}).get("exemplos_proprios") else None)
+
+
+# 🧠 v84_473: no canal de exemplos do zero a fonte só tem as IDEIAS (as histórias da aula saíram) — o tamanho vem de
+# aprofundar cada ideia com exemplos novos, aplicações e os estudos reais, não de "mais fatos da fonte".
+REGRAS_COMPLETAR_PROPRIOS = [
+    "neste canal a fonte traz só as IDEIAS: aprofunde CADA ideia com exemplos NOVOS criados do zero (cenas do dia a dia, "
+    "assumidas como hipotéticas: \"imagine alguém que…\"), cada um mostrando o mecanismo de um jeito diferente "
+    "(trabalho, relacionamento, celular, comida, dinheiro, estudo…);",
+    "explique o PORQUÊ de cada mecanismo passo a passo (o que acontece no cérebro/na cabeça, em linguagem simples), as "
+    "objeções que o espectador faria e a resposta, os limites (quando a ideia não vale) e como aplicar na vida — com um "
+    "pequeno exercício pro espectador testar;",
+    "estudos, autores e experimentos só os REAIS e conhecidos (nunca invente nome, número ou resultado); "
+    "NUNCA use as histórias, casos ou exemplos da fonte original;",
+]
 
 
 def ler_resposta(texto: str, p: Dict[str, Any]) -> Dict[str, Any]:
