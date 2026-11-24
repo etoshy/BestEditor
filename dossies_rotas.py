@@ -23,9 +23,18 @@ def registrar(app, base_dir: str) -> None:
 
     def _proj(pid: str):
         try:
-            return ds.carregar(base_dir, pid)
+            p = ds.carregar(base_dir, pid)
         except ds.DossieError:
             return None
+        cfg = p.get("config") or {}
+        if not cfg.get("historias_proibidas") and (ds.MODELOS.get(cfg.get("modelo")) or {}).get("exemplos_proprios"):
+            try:  # 🧠 v84_475: projeto antigo do texto bruto — as histórias proibidas vêm da aula (só na memória)
+                hs = __import__("temas_bruto").historias_do_projeto(base_dir, pid)
+                if hs:
+                    cfg["historias_proibidas"] = hs
+            except Exception:  # noqa: BLE001
+                pass
+        return p
 
     def _fontes_web_bg(p: Dict[str, Any]) -> None:
         """📚 v84_432: roteiro novo → as fontes da descrição em segundo plano (links conferidos)."""

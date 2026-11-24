@@ -141,6 +141,29 @@ def listar(base: str) -> List[Dict[str, Any]]:
     return sorted(out, key=__import__("tempo_ui").mais_novo)  # 🔝 v84_422: o mais novo em cima
 
 
+_HIST_PROJ: Dict[str, Any] = {}
+
+
+def historias_do_projeto(base: str, pid: str) -> List[Dict[str, Any]]:
+    """🧠 v84_475: projeto criado ANTES de o site passar as histórias pro projeto → acha a aula de onde ele saiu."""
+    if pid in _HIST_PROJ and time.time() - _HIST_PROJ[pid][0] < 300:
+        return _HIST_PROJ[pid][1]
+    achou: List[Dict[str, Any]] = []
+    raiz = _pasta(base)
+    for aid in (os.listdir(raiz) if os.path.isdir(raiz) else []):
+        if not _RE_ID.match(aid):
+            continue
+        try:
+            a = carregar(base, aid)
+        except TemasErro:
+            continue
+        if any(t.get("projeto") == pid for t in a.get("temas") or []):
+            achou = list(a.get("historias") or [])
+            break
+    _HIST_PROJ[pid] = (time.time(), achou)
+    return achou
+
+
 def excluir(base: str, aid: str) -> None:
     import shutil
     d = _pasta(base, aid)

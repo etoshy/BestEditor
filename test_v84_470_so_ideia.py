@@ -80,3 +80,12 @@ def test_v474_canal_proibidas_e_marcas(tmp_path, monkeypatch):
     p["config"]["minutos"] = 20
     c = ds.prompt_completar(p)
     assert "PROIBIDAS" in c and "AS NOTAS NÃO SÃO FALA" in c
+
+
+def test_v475_projeto_antigo_acha_historias(tmp_path):
+    import dossies as ds
+    p = ds.criar(str(tmp_path), tema="x", modelo="raciocinio_maldito")
+    a = tb.criar(str(tmp_path), "aula", "raciocinio_maldito", ("palavra " * 300).encode(), "a.txt")
+    hs = [{"resumo": "parou de fumar correndo", "palavras": ["cigarro"]}]
+    tb.mexer(str(tmp_path), a["id"], lambda x: x.update(historias=hs, temas=[{"id": "t1", "titulo": "t", "projeto": p["id"]}]))
+    assert tb.historias_do_projeto(str(tmp_path), p["id"]) == hs
