@@ -467,7 +467,16 @@ MODELOS: Dict[str, Dict[str, Any]] = {
                 "A situação em que você se reconhece", "O nome / o mecanismo, em uma frase", "O detalhe que incomoda",
                 "Pergunta"]},
         },
+        "exemplos_proprios": True,  # v84_467: a aula dá a IDEIA; os exemplos são criados do zero
         "regras": [
+            "EXEMPLOS DO ZERO (a regra mais importante deste canal): da aula/fonte você pega SÓ a ideia — o conceito, a "
+            "profundidade, o raciocínio, os dados e os estudos de verdade. Os EXEMPLOS, casos, analogias, situações e "
+            "historinhas que a aula usa NÃO entram, nem trocando o nome ou um detalhe: crie exemplos NOVOS, tão bons ou "
+            "melhores, que mostrem exatamente o mesmo mecanismo (outra cena, outro contexto da vida — relacionamento, "
+            "trabalho, família, internet, dinheiro, amizade). Teste: quem viu a aula não pode reconhecer nenhum exemplo do "
+            "vídeo. Exemplo inventado é SEMPRE assumido como hipotético ('Imagine alguém que…', 'Pense na última vez que "
+            "você…') — nunca como caso real com nome, data ou número. Estudo e dado real continuam do jeito que são (não se "
+            "inventa estudo).",
             "É PSICOLOGIA pra quem não estudou: termo técnico só com a explicação na mesma frase (ou troque pela situação "
             "que ele descreve). O vídeo é sobre a vida de quem assiste, não uma aula.",
             "Nada de diagnóstico: nunca diga que quem assiste TEM um transtorno ('você é narcisista', 'isso é TDAH'); fale "
@@ -557,6 +566,20 @@ REGRA_FALA = (
     "se precisar de explicação, troque por outra ou corte. "
     "RESSALVA CURTA: no máximo uma ressalva quando muda o sentido — nada de empilhar \"não é X, mas um exemplo para pensar\", "
     "\"alguns filósofos argumentam…, mas isso não significa…\".")
+
+
+_EXEMPLO_COM_NOME = re.compile(r"EXEMPLO COM NOME FICA COM NOME:.*?só quando a fonte não tem um real\. ", re.S)
+
+
+def regra_fala(mod: Optional[Dict[str, Any]] = None) -> str:
+    """🧠 v84_467: no canal de "exemplos do zero" (Raciocínio Maldito) os exemplos da fonte NÃO entram — a regra geral
+    (o exemplo com nome da fonte fica com nome) vira a do canal; obra, autor e estudo reais continuam com nome."""
+    if not (mod or {}).get("exemplos_proprios"):
+        return REGRA_FALA
+    return _EXEMPLO_COM_NOME.sub(
+        "EXEMPLOS NOVOS: os exemplos, casos e historinhas da FONTE não entram — crie outros do zero, assumidos como "
+        "hipotéticos (\"imagine alguém que…\"), mostrando o mesmo mecanismo; só autor, obra e estudo REAIS entram com o "
+        "nome (sem inventar nenhum). ", REGRA_FALA)
 REGRA_PRODUTO = (
     "PRODUTO SUGERIDO: sugira UM produto real que combine de verdade com o tema e com o público deste vídeo (ex.: um livro sobre "
     "o caso/assunto, um documentário, um item útil ligado ao tema — nunca algo de mau gosto em relação às vítimas). Ele "
@@ -1256,7 +1279,7 @@ def prompt_roteiro(p: Dict[str, Any], base: Optional[str] = None) -> str:
         L.append(f"- Pedido extra (siga com prioridade): {cfg['extra'].strip()[:1500]}")
     if cfg.get("sem_experiencias", True):
         L.append("- " + REGRA_SEM_PESSOAL)
-    L.append("- " + REGRA_FALA)
+    L.append("- " + regra_fala(mod))
     _perfil = perfil_do_modelo(cfg.get("modelo"))
     if _perfil:  # 🎭 v84_173: canal com personagens — falas multi voz, emoção por fala, lore, continuidade, histórico
         import canal_perfil
@@ -1555,7 +1578,7 @@ def _contexto_partes(p: Dict[str, Any], base: Optional[str] = None) -> Dict[str,
         regras.append(_ev.split("\n", 1)[-1] + "\n(A ABERTURA é só da 1ª parte; o FECHO e a CHAMADA, só da última.)")
     if cfg.get("sem_experiencias", True):  # 🧹 v84_418: a regra (sem "segundo as notas", sem crédito da fonte) vale em cada parte
         regras.append(REGRA_SEM_PESSOAL)
-    regras.append(REGRA_FALA)  # ✍ v84_432: cada parte sem "a parte anterior", com o retorno assumido
+    regras.append(regra_fala(mod))  # ✍ v84_432: cada parte sem "a parte anterior", com o retorno assumido
     _perfil = perfil_do_modelo(cfg.get("modelo"))
     _pb = ""
     if _perfil:
