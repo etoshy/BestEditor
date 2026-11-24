@@ -438,6 +438,54 @@ MODELOS: Dict[str, Dict[str, Any]] = {
             "Analogias simples, sem errar a ciência pra simplificar.",
         ],
     },
+    # 🧠 v84_466: o 2º canal do formato CenarioM (aulas → vídeos de ensaio narrado), no nicho de PSICOLOGIA
+    "raciocinio_maldito": {
+        "nome": "🧠 Raciocínio Maldito (psicologia)",
+        "descricao": "Psicologia e comportamento humano em ensaio narrado: por que a gente sente, pensa e age como age — "
+                     "a ideia de uma aula (ou de um tema) explicada com exemplos do dia a dia, sem cara de aula.",
+        "nome_canal": "Raciocínio Maldito",
+        "escopo_enxuto": True,  # explicativo: menos fatos por capítulo, sem ler a fonte em voz alta
+        "formatos": {
+            "ensaio": {"nome": "🧠 Ensaio (uma ideia da psicologia, a fundo)", "minutos": 12, "estrutura": [
+                "GANCHO: a situação do dia a dia em que quem assiste se reconhece (ou a pergunta incômoda sobre si mesmo)",
+                "O que quase todo mundo acha que explica isso — e por que não basta",
+                "A ideia central da psicologia que explica de verdade, dita em palavras simples",
+                "Como ela aparece na vida real: 2 ou 3 situações concretas (relacionamento, trabalho, família, internet)",
+                "O lado que ninguém conta: o custo, a armadilha ou o mecanismo escondido",
+                "A melhor objeção / onde a ideia tem limite",
+                "O que muda quando você enxerga isso — sem virar autoajuda",
+                "Fechamento: uma frase forte ou uma pergunta pra pensar"]},
+            "mecanismo": {"nome": "⚙ Por que a gente faz isso? (o mecanismo)", "minutos": 10, "estrutura": [
+                "GANCHO: o comportamento estranho que todo mundo tem",
+                "A explicação curta", "O mecanismo por trás, passo a passo, com uma analogia do dia a dia",
+                "O estudo ou o autor clássico que mostrou isso (se a fonte tiver — sem inventar número)",
+                "Onde isso te pega sem você perceber", "Fechamento"]},
+            "mito": {"nome": "🧨 Mito da psicologia pop (desmontado)", "minutos": 10, "estrutura": [
+                "GANCHO: a frase que todo mundo repete", "De onde ela veio", "O que a pesquisa diz de fato",
+                "O que sobra de verdade nela", "Fechamento"]},
+            "curto": {"nome": "⚡ Shorts / Reels (até 60 s)", "minutos": 1, "estrutura": [
+                "A situação em que você se reconhece", "O nome / o mecanismo, em uma frase", "O detalhe que incomoda",
+                "Pergunta"]},
+        },
+        "regras": [
+            "É PSICOLOGIA pra quem não estudou: termo técnico só com a explicação na mesma frase (ou troque pela situação "
+            "que ele descreve). O vídeo é sobre a vida de quem assiste, não uma aula.",
+            "Nada de diagnóstico: nunca diga que quem assiste TEM um transtorno ('você é narcisista', 'isso é TDAH'); fale "
+            "de comportamentos, tendências e mecanismos. Transtorno só como explicação geral, sem lista de sintomas pra se "
+            "autodiagnosticar.",
+            "Nada de conselho clínico ou de remédio como orientação. Quando o tema encostar em sofrimento sério (depressão, "
+            "ansiedade forte, trauma, vício), uma frase curta e natural dizendo que ajuda profissional faz diferença — sem "
+            "sermão e sem quebrar o vídeo.",
+            "Suicídio, automutilação e transtorno alimentar: só em termos gerais e respeitosos, nunca método, detalhe ou "
+            "número de jeito sensacionalista (regra do YouTube e de monetização).",
+            "Estudos e experimentos só os que estão nas fontes ou são clássicos bem documentados (Milgram, Asch, marshmallow, "
+            "Stanford — e diga quando um foi contestado ou não se replicou). Nada de 'estudos mostram' sem dizer qual.",
+            "Psicologia pop (linguagem do amor, 'usamos 10% do cérebro', tipos de personalidade de internet, 'cérebro "
+            "esquerdo/direito'): se aparecer, diga o que a pesquisa diz de verdade.",
+            "Mesmo sistema do CenarioM: não cite o professor, a aula nem o curso de onde a ideia veio; autores e obras "
+            "clássicas podem aparecer (autor + obra), sem ler página nem ano em voz alta.",
+        ],
+    },
 }
 
 TIPOS_MIDIA = {"foto": "🖼 Foto", "video": "🎥 Vídeo", "texto": "📝 Texto", "link": "🔗 Link/página"}
