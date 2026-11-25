@@ -123,3 +123,12 @@ def test_v479_partes_veem_texto_anterior_e_mapa():
     pr = rp.prompt_parte({"tema": "x", "minutos": 10}, partes, 2)
     assert "Exemplo do relatório atrasado" in pr and "GASTO" in pr
     assert "nenhum fica de fora" in inspect.getsource(temas_bruto_rotas)
+
+
+def test_v480_bastidor_exemplo_chamadas():
+    import dossies as ds
+    import metodo_roteiro as mr
+    t = mr.tirar_bastidor("Foi isso que a réplica fez nas partes anteriores. A peça que faltava na conversa anterior sobre a réplica.")
+    assert "partes anteriores" not in t and "quando falamos da réplica" in t
+    assert "EXEMPLO TEM QUE FUNCIONAR" in ds.REGRA_FALA and "O FECHAMENTO SÓ AMARRA" in ds.REGRA_FALA
+    assert ds.MODELOS["raciocinio_maldito"]["chamadas"]["venda"] == 1

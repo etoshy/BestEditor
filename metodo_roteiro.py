@@ -674,6 +674,13 @@ _BASTIDOR = [
      + " argumento " + m.group(2)),
     (re.compile(r"\bSegundo o argumento do trecho,\s*", re.I), "Segundo esse argumento, "),
     (re.compile(r"\b(?:na|numa) aula de \d{1,2} de \w+ de \d{4}\b", re.I), ""),
+    # ✍ v84_480: costuras no plural / "conversa anterior"
+    (re.compile(r"\b(?:nas|das) (?:partes|seções|etapas) anteriores\b", re.I), "até aqui"),
+    (re.compile(r"\b(?:nas|das) próximas (?:partes|seções|etapas)\b", re.I), "daqui pra frente"),
+    (re.compile(r"\bque faltava na conversa anterior sobre (a|o|as|os)\b", re.I),
+     lambda m: "que faltava quando falamos d" + m.group(1).lower()),
+    (re.compile(r"\bque faltava na conversa anterior sobre\b", re.I), "que faltava quando falamos de"),
+    (re.compile(r"\b(?:na|da) conversa anterior\b", re.I), "agora há pouco"),
 ]
 
 

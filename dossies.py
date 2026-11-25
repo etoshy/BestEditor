@@ -467,6 +467,7 @@ MODELOS: Dict[str, Dict[str, Any]] = {
                 "A situação em que você se reconhece", "O nome / o mecanismo, em uma frase", "O detalhe que incomoda",
                 "Pergunta"]},
         },
+        "chamadas": {"inscreva": 2, "venda": 1},  # ✍ v84_480: saíam 3 [[VENDA]] num vídeo de 17 min
         "exemplos_proprios": True,  # v84_467: a aula dá a IDEIA; os exemplos são criados do zero
         # 🧠 v84_476: o que rende vídeo NESTE canal (o público é leigo, não estudante de psicologia/neuro)
         "criterio_temas": ("- NESTE CANAL o público é LEIGO e curioso sobre a própria cabeça: tema = medo, vício, culpa, "
@@ -568,6 +569,12 @@ REGRA_FALA = (
     "EXEMPLO DO DIA A DIA NÃO SE REPETE: a mesma situação (o amigo de anos, a porta trancada…) entra UMA vez; para a "
     "próxima ideia, use outra situação — e VARIAÇÕES da mesma situação contam como a mesma (dois exemplos de \"atraso no "
     "trabalho\", um do relatório e outro da reunião, são UM exemplo repetido). "
+    "EXEMPLO TEM QUE FUNCIONAR: antes de usar, confira se a cena faz sentido no mundo real (quem diz, onde, por quê) e se "
+    "mostra EXATAMENTE a ideia — nada de cena absurda (um desconhecido na fila te acusando de algo aleatório), frase que se "
+    "contradiz ou exemplo que, lido com atenção, prova outra coisa. Afirmação técnica (lógica, ciência) dita com cuidado: "
+    "o que é só uma das leituras possíveis é dito como tal. "
+    "O FECHAMENTO SÓ AMARRA: nenhum conceito novo no fim (o que não foi explicado antes não aparece na conclusão) e UMA "
+    "conclusão só — sem recapitular duas vezes. "
     "CADA IDEIA É EXPLICADA UMA VEZ: depois de explicada, ela só volta numa frase (pra ligar com a próxima) — nunca "
     "reexplicada com outro exemplo em outra parte. Cada parte do vídeo tem que trazer algo que o espectador ainda NÃO ouviu. "
     "CITAÇÃO NA FALA: autor + obra (ex.: \"Louis Lavelle, em A Intimidade Espiritual\") — sem ano, página, edição ou nome "
