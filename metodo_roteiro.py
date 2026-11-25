@@ -680,6 +680,7 @@ _BASTIDOR = [
     (re.compile(r"\bque faltava na conversa anterior sobre (a|o|as|os)\b", re.I),
      lambda m: "que faltava quando falamos d" + m.group(1).lower()),
     (re.compile(r"\bque faltava na conversa anterior sobre\b", re.I), "que faltava quando falamos de"),
+    (re.compile(r"\bonde a (?:conversa |parte )?anterior parou\b", re.I), "onde a gente parou"),
     (re.compile(r"\b(?:na|da) conversa anterior\b", re.I), "agora há pouco"),
     (re.compile(r"\bEu sou o narrador,? e (este|esse) é\b"), lambda m: m.group(1).capitalize() + " é"),
     (re.compile(r"\s*\bEu sou o narrador\.\s*"), " "),

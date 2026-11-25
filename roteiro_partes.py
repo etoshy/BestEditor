@@ -408,6 +408,7 @@ def montar(partes: List[Dict[str, Any]], marcar_chamadas: bool = True, total_pal
     total = sum(palavras(p.get("texto") or "") for p in partes) or 1
     acum = 0
     ultima_venda = 0
+    n_venda = 0
     inscreva_posta = False
     n = len(partes)
     for i, p in enumerate(partes):
@@ -434,7 +435,12 @@ def montar(partes: List[Dict[str, Any]], marcar_chamadas: bool = True, total_pal
             continue
         if max_venda is not None and int(max_venda) <= 0:  # v84_367: canal sem venda
             continue
-        if acum / total >= 0.15 and acum - ultima_venda >= max(600, total // 4):  # v84_99: ~3 no vídeo, não 6
+        if max_venda is not None and n_venda >= int(max_venda):  # ✍ v84_485: o máximo do canal (ex.: 1) — antes só valia o 0
+            continue
+        # com máximo 1: no meio do vídeo (~40%), não no 1º respiro
+        if (acum / total >= (0.4 if max_venda is not None and int(max_venda) == 1 else 0.15)
+                and acum - ultima_venda >= max(600, total // 4)):  # v84_99: ~3 no vídeo, não 6
             blocos.append("[[VENDA]]")
             ultima_venda = acum
+            n_venda += 1
     return "\n\n".join(blocos), caps

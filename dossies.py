@@ -1513,6 +1513,21 @@ def ler_resultado(texto: str, p: Dict[str, Any]) -> Dict[str, Any]:
         if _n_venda:
             rot = re.sub(r"\n{3,}", "\n\n", re.sub(r"^[ \t]*\[\[\s*VENDA[^\]]*\]\][ \t]*$", "", rot, flags=re.I | re.M)).strip()
             avisos.append(f"📣 {_n_venda} [[VENDA]] tirada(s) — este canal não usa venda.")
+    else:
+        try:
+            _max_v = int((_modelo_cfg(p).get("chamadas") or {}).get("venda"))
+        except (TypeError, ValueError):
+            _max_v = 0
+        _rx_v = re.compile(r"^[ \t]*\[\[\s*VENDA[^\]]*\]\][ \t]*$", re.I | re.M)
+        _todas = list(_rx_v.finditer(rot))
+        if _max_v > 0 and len(_todas) > _max_v:  # ✍ v84_485: no máximo N — fica(m) a(s) mais perto do meio do vídeo
+            meio = len(rot) / 2
+            ficam = set(sorted(range(len(_todas)), key=lambda i: abs(_todas[i].start() - meio))[:_max_v])
+            for i in sorted(range(len(_todas)), reverse=True):
+                if i not in ficam:
+                    rot = rot[:_todas[i].start()] + rot[_todas[i].end():]
+            rot = re.sub(r"\n{3,}", "\n\n", rot).strip()
+            avisos.append(f"📣 {len(_todas) - _max_v} [[VENDA]] a mais tirada(s) — o canal usa {_max_v} por vídeo.")
     rot = _mr.tirar_meta_fonte(rot)  # 🧹 v84_418: "segundo as notas…" não vai pro vídeo
     rot, _ctas = _mr.uma_chamada_comentario(rot)  # ✍ v84_440: um "comenta aí" só, no fim
     if _ctas:

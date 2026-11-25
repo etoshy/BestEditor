@@ -749,6 +749,62 @@ def registrar(app, base_dir: str) -> None:
                                  alvo={"origem": origem, "pid": pid})
         return jsonify({"ok": True, "tarefa": tid, "prompt": t})
 
+    # ------------------------------------------------------------------ 🧪 v84_486: verificação de qualidade (depois de pronto)
+    def _mapa(origem: str, p: Dict[str, Any]) -> str:
+        if origem == "dossie":
+            return str((p.get("config") or {}).get("extra") or "")
+        return ""
+
+    @app.route("/qualidade/<origem>/<pid>/prompt", methods=["POST"])
+    def qualidade_prompt(origem: str, pid: str):
+        import idiomas
+        import qualidade_roteiro as qr
+        try:
+            p, texto, pad = _roteiro(origem, pid)
+        except Exception:  # noqa: BLE001
+            return jsonify({"erro": "Projeto não encontrado."}), 404
+        try:
+            pr = qr.prompt(texto, str(p.get("tema") or p.get("titulo") or ""), _fontes(origem, p), _mapa(origem, p),
+                           idiomas.nome_para_prompt(idiomas.normalizar(pad["idioma"]) or "pt"), int(pad.get("alvo") or 0),
+                           pad.get("canal") or "")
+        except ValueError as exc:
+            return jsonify({"erro": str(exc)}), 400
+        return jsonify({"ok": True, "prompt": pr, "caracteres": len(pr), "palavras": len(texto.split())})
+
+    @app.route("/qualidade/<origem>/<pid>/ler", methods=["POST"])
+    def qualidade_ler(origem: str, pid: str):
+        import qualidade_roteiro as qr
+        try:
+            p, texto, pad = _roteiro(origem, pid)
+        except Exception:  # noqa: BLE001
+            return jsonify({"erro": "Projeto não encontrado."}), 404
+        try:
+            d = qr.ler(str((request.get_json(silent=True) or {}).get("texto") or ""))
+        except ValueError as exc:
+            return jsonify({"erro": str(exc)}), 400
+        if not d["trocas"]:
+            return jsonify({"ok": True, "aplicadas": [], "nao_achadas": [], "resumo": d["resumo"] or "nenhum erro encontrado",
+                            "palavras_antes": len(texto.split()), "palavras_depois": len(texto.split())})
+        r = qr.aplicar(texto, d)
+        r, _t2 = _reacertar(p, pid, r, d["trocas"])  # o "de" que não bateu: a IA acha o trecho certo
+        alvo = int(pad.get("alvo") or 0)
+        if alvo and r["palavras_depois"] < r["palavras_antes"] * 0.85 and r["palavras_depois"] < alvo * 0.9:
+            return jsonify({"erro": f"As correções encolheriam o roteiro de {r['palavras_antes']} pra {r['palavras_depois']} "
+                                    f"palavras (o vídeo pede ~{alvo}) — não apliquei. Peça de novo à IA lembrando que o que "
+                                    "sai por repetição tem de voltar como conteúdo novo."}), 400
+        g = {}
+        if r["aplicadas"]:
+            avisos = [f"🧪 {len(r['nao_achadas'])} correção(ões) da verificação não bateram com o texto."] if r["nao_achadas"] else []
+            g = _gravar(origem, pid, p, r["texto"], texto, avisos, chave_antes="roteiro_antes_correcao",
+                        hist=("🧪 verificação de qualidade", f"{len(r['aplicadas'])} correção(ões) · {r['palavras_antes']} → "
+                              f"{r['palavras_depois']} palavras"))
+        por_tipo: Dict[str, int] = {}
+        for a in r["aplicadas"]:
+            por_tipo[a.get("tipo") or "outro"] = por_tipo.get(a.get("tipo") or "outro", 0) + 1
+        return jsonify({"ok": True, "aplicadas": r["aplicadas"], "nao_achadas": r["nao_achadas"], "resumo": d["resumo"],
+                        "por_tipo": {qr.TIPOS.get(k, k): v for k, v in por_tipo.items()},
+                        "palavras_antes": r["palavras_antes"], "palavras_depois": r["palavras_depois"], **g})
+
     @app.route("/checagem/<origem>/<pid>/web/ler", methods=["POST"])
     def checagem_web_ler(origem: str, pid: str):
         import json as _json

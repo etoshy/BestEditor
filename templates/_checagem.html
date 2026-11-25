@@ -1,5 +1,52 @@
 {# 🔎 Checagem do roteiro: ⏳ cronologia · 📚 alegações históricas · ✂️ repetições (checagem_roteiro.py, v84_99)
    incluir com: {% set rt_origem = 'dossie' %}{% set rt_id = p.id %}{% include "_checagem.html" %} #}
+<!-- 🧪 v84_486: verificação de qualidade DEPOIS de pronto — acha os erros e devolve só as correções (JSON) -->
+<div id="qlCard" style="background:#fff;border:1px solid #c4b5fd;border-radius:10px;padding:14px 16px;margin:14px 0;">
+  <h2 style="margin:0 0 6px;font-size:1.1rem;">🧪 Verificação de qualidade <span style="font-weight:400;font-size:.82rem;color:#666;">confere o roteiro pronto contra a fonte e o mapa do tema: 📐 conceito errado · ⚖ contradição · 🧩 exemplo que não funciona · 🔁 repetição · 👻 referência órfã · 🩹 frase quebrada · 🎬 bastidor · ➕ ponto que faltou · 🔚 fechamento · 📣 chamada — devolve SÓ as correções (JSON) e o site aplica, sem encolher o vídeo (versão no 🕘 histórico)</span></h2>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:.86rem;">
+    <button type="button" id="qlGerar" style="width:auto;margin:0;padding:5px 12px;background:#7c3aed">📝 Gerar o prompt da verificação</button>
+    <button type="button" data-ia-gerar="qlGerar" data-ia-prompt="qlPrompt" data-ia-resp="qlResp" data-ia-ler="qlLer" data-ia-status="qlSt" style="display:none;width:auto;margin:0;padding:5px 12px;background:#4338ca;color:#fff">🤖 Verificar e corrigir com a IA do site</button>
+    <span id="qlSt" style="color:#555;"></span>
+  </div>
+  <textarea id="qlPrompt" rows="4" readonly style="display:none;width:100%;margin-top:6px;font-family:monospace;font-size:.78rem;"></textarea>
+  <label style="margin-top:8px;display:block;font-size:.86rem;">JSON que a IA devolveu <span style="font-weight:400;color:#888">(ou cole aqui a resposta de outra IA — ChatGPT, Claude, Gemini…)</span></label>
+  <textarea id="qlResp" rows="4" style="width:100%;font-size:.85rem;" placeholder='{ "correcoes": [ { "tipo": "contradicao", "de": "trecho exato do roteiro", "para": "o texto certo", "porque": "..." } ], "resumo": "..." }'></textarea>
+  <button type="button" id="qlLer" style="width:auto;margin-top:4px;padding:5px 12px;">✅ Corrigir o roteiro</button>
+  <div id="qlRes" style="font-size:.85rem;margin-top:6px;"></div>
+</div>
+<script>
+(function () {
+  const QB = '/qualidade/' + {{ rt_origem|tojson }} + '/' + {{ rt_id|tojson }};
+  const $q = (id) => document.getElementById(id);
+  const escq = (t) => String(t == null ? '' : t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const postq = async (url, corpo) => { const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corpo || {}) }); const d = await r.json().catch(() => ({})); if (!r.ok || d.erro) throw new Error(d.erro || (r.status === 404 ? '404 — feche a janela do site (python app.py) e abra de novo' : r.status)); return d; };
+  $q('qlGerar').addEventListener('click', async () => {
+    $q('qlSt').textContent = '📝 montando…';
+    try {
+      const d = await postq(QB + '/prompt');
+      $q('qlPrompt').value = d.prompt; $q('qlPrompt').style.display = '';
+      const info = `${Math.round(d.caracteres / 1000)} mil caracteres · roteiro de ${d.palavras} palavras + a fonte + o mapa`;
+      try { await navigator.clipboard.writeText(d.prompt); $q('qlSt').textContent = '✔ prompt copiado — ' + info + '. Cole numa IA e traga o JSON.'; } catch (_) { $q('qlSt').textContent = '✔ prompt pronto — ' + info; }
+    } catch (e) { $q('qlSt').textContent = '⚠ ' + e.message; }
+  });
+  $q('qlLer').addEventListener('click', async () => {
+    const btn = $q('qlLer');
+    if (!$q('qlResp').value.trim()) { $q('qlRes').innerHTML = '<span style="color:#b91c1c">⚠ cole primeiro o JSON da IA</span>'; return; }
+    btn.disabled = true; const rot = btn.textContent; btn.textContent = '⏳ corrigindo…';
+    $q('qlRes').innerHTML = '<span style="color:#555">⏳ aplicando as correções… (se algum trecho não bater, a IA acerta — pode levar 1–2 min)</span>';
+    try {
+      const d = await postq(QB + '/ler', { texto: $q('qlResp').value });
+      const tipos = Object.entries(d.por_tipo || {}).map(([k, v]) => `${k} ×${v}`).join(' · ');
+      $q('qlRes').innerHTML = `<span style="color:#15803d">✔ ${d.aplicadas.length} correção(ões) · ${d.palavras_antes} → ${d.palavras_depois} palavras${tipos ? ' · ' + escq(tipos) : ''}</span>`
+        + (d.resumo ? `<div style="color:#444;margin-top:2px">${escq(d.resumo)}</div>` : '')
+        + (d.nao_achadas.length ? `<div style="color:#b45309">⚠ ${d.nao_achadas.length} não bateram com o texto: ${d.nao_achadas.map((x) => '„' + escq(x.de) + '“').join(' · ')}</div>` : '')
+        + (d.aplicadas.length ? `<details open><summary>ver as correções</summary>${d.aplicadas.map((t) => `<div style="margin:5px 0">${escq(t.motivo || '')} <s style="color:#b91c1c">${escq(t.de)}</s><br><span style="color:#15803d">${escq(t.para) || '<i>(apagado)</i>'}</span>${t.porque ? `<br><i style="color:#666">${escq(t.porque)}</i>` : ''}</div>`).join('')}</details><div style="color:#555">Recarregando em 8 s…</div>` : '');
+      if (d.aplicadas.length) setTimeout(() => location.reload(), 8000);
+    } catch (e) { $q('qlRes').innerHTML = `<span style="color:#b91c1c">⚠ ${escq(e.message)}</span>`; }
+    finally { btn.disabled = false; btn.textContent = rot; }
+  });
+})();
+</script>
 <div id="chkCard" style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:14px 16px;margin:14px 0;">
   <h2 style="margin:0 0 6px;font-size:1.1rem;">🔎 Checagem do roteiro <span style="font-weight:400;font-size:.82rem;color:#666;">⏳ cronologia · 📚 alegações históricas · ✂️ repetições — a IA confere contra as fontes do projeto e devolve as correções; o site aplica (e guarda uma versão no 🕘 histórico)</span></h2>
   <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:4px 0 8px;padding:8px 10px;background:#eef2ff;border-radius:8px;">
@@ -232,6 +279,11 @@
     catch (e) { $c('chkWebSt').textContent = '⚠ ' + e.message; }
   });
   $c('chkWebLer').addEventListener('click', async () => {
+    const btn = $c('chkWebLer');
+    if (!$c('chkWebResp').value.trim()) { $c('chkWebRes').innerHTML = '<span style="color:#b91c1c">⚠ cole primeiro o JSON que a outra IA devolveu</span>'; return; }
+    // ⏳ v84_484: o ajuste pode levar 1–2 min (a IA acerta os trechos que não bateram) — antes não mostrava nada e parecia que não ia
+    btn.disabled = true; const rot = btn.textContent; btn.textContent = '⏳ ajustando…';
+    $c('chkWebRes').innerHTML = '<span style="color:#555">⏳ aplicando as correções no roteiro… (se algum trecho não bater, a IA acerta — pode levar 1–2 min)</span>';
     try {
       const d = await post(BASE + '/web/ler', { texto: $c('chkWebResp').value });
       $c('chkWebRes').innerHTML = `<span style="color:#15803d">✔ ${d.aplicadas.length} trecho(s) corrigido(s) · ${d.palavras_antes} → ${d.palavras_depois} palavras · ${d.conferidos.filter(c => c.ok).length} item(ns) confirmado(s)${d.verificar_marcados ? ` (${d.verificar_marcados} marcados como conferidos)` : ''}</span>` + ((d.sem_resposta || []).length ? `<br><span style="color:#b45309">⚠ a IA não respondeu ${d.sem_resposta.length} item(ns): ${esc(d.sem_resposta.join(', '))} — gere o prompt de novo e mande (os conferidos e os “não é repetição” já não vão)</span>` : '') +
@@ -241,6 +293,7 @@
         (d.aplicadas.length ? '<div style="color:#555">Recarregando em 6 s…</div>' : '');
       if (d.aplicadas.length) setTimeout(() => location.reload(), 6000); else carregar();
     } catch (e) { $c('chkWebRes').innerHTML = `<span style="color:#b91c1c">⚠ ${esc(e.message)}</span>`; }
+    finally { btn.disabled = false; btn.textContent = rot; }
   });
 
   // 🔷 Gemini com a busca do Google (v84_162)

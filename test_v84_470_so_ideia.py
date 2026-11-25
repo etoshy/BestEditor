@@ -158,3 +158,17 @@ def test_v483_revisao_nao_encolhe_e_tts_cortado():
     assert "nunca só apague" in pr
     with pytest.raises(ValueError):
         at.ler_resposta("palavra " * 100, "palavra " * 1000)
+
+
+def test_v485_venda_no_maximo_do_canal(tmp_path):
+    import dossies as ds
+    import metodo_roteiro as mr
+    import roteiro_partes as rp
+    partes = [{"k": k, "titulo": f"P{k}", "texto": "palavra " * 500} for k in range(1, 9)]
+    rot, _c = rp.montar(partes, True, 4000, max_inscreva=2, max_venda=1)
+    assert rot.count("[[VENDA]]") == 1
+    p = ds.criar(str(tmp_path), tema="x", modelo="raciocinio_maldito")
+    txt = "\n\n".join(["texto " * 200, "[[VENDA]]", "texto " * 200, "[[VENDA]]", "texto " * 200, "[[VENDA]]", "fim " * 50])
+    res = ds.ler_resultado('{"roteiro": ' + __import__("json").dumps(txt) + '}', p)
+    assert res["roteiro"].count("[[VENDA]]") == 1
+    assert "anterior parou" not in mr.tirar_bastidor("E essa conversa começa onde a anterior parou: a sensação.")

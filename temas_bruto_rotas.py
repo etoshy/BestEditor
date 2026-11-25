@@ -116,6 +116,13 @@ def registrar(app, base_dir: str, transcricoes_dir: str = "", jobs_transcricao=N
                 try:
                     _esperar_tarefa(_post(f"/roteiro-auto/dossie/{pid}", {"pagina": f"/modelos-video/{pid}"})["tarefa"])
                     _completar_tamanho(aid, tid, pid, t)  # 📏 v84_483: a revisão cortou repetição e encolheu demais? completa
+                    try:  # 🧪 v84_486: verificação de qualidade (conceito errado, contradição, repetição, faltou do mapa…)
+                        _estado(aid, tid, "revisao", "🧪 verificando a qualidade do roteiro…")
+                        prq = _post(f"/qualidade/dossie/{pid}/prompt")["prompt"]
+                        rq = _post("/ia/gerar", {"prompt": prq, "titulo": "Verificação: " + t["titulo"][:80]})
+                        _post(f"/qualidade/dossie/{pid}/ler", {"texto": rq.get("texto") or ""})
+                    except Exception:  # noqa: BLE001 — sem a verificação o roteiro continua valendo
+                        pass
                     pr = _post(f"/tts-adaptar/dossie/{pid}/prompt")["prompt"]
                     resp = _post("/ia/gerar", {"prompt": pr, "titulo": "TTS: " + t["titulo"][:80]})
                     _post(f"/tts-adaptar/dossie/{pid}/ler", {"texto": resp.get("texto") or ""})
