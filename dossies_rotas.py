@@ -97,6 +97,12 @@ def registrar(app, base_dir: str) -> None:
     def dossie_livros_sugerir(pid: str):
         return _livros_acao(pid, lambda p, la: {"livros": la.sugerir(p)})
 
+    @app.route("/modelos-video/<pid>/livros/trocar", methods=["POST"])
+    def dossie_livros_trocar(pid: str):  # 🔁 v84_489: "não achei na Amazon" → outro livro (que existe no Brasil)
+        c = request.get_json(silent=True) or {}
+        i = int(c["i"]) if str(c.get("i", "")).isdigit() else -1
+        return _livros_acao(pid, lambda p, la: {"livro": la.trocar(p, i)})
+
     @app.route("/modelos-video/<pid>/livros/link", methods=["POST"])
     def dossie_livros_link(pid: str):
         c = request.get_json(silent=True) or {}

@@ -657,7 +657,8 @@ function livrosHtml(R) {
       <span class="ds-hint">Seu código de afiliado: <input id="lvTag" placeholder="ex.: seunome-20" style="width:130px;display:inline-block;margin:0;padding:2px 6px;font-size:.8rem"></span><span class="ds-hint" id="lvSt"></span></div>
     ${L.sugerido_em && !sug.length ? `<div class="ds-hint" style="margin-top:4px">🚫 A IA acha que este vídeo não pede livro${L.motivo ? ': ' + esc(L.motivo) : ''}. (Melhor não forçar — ninguém compraria.)</div>` : ''}
     ${sug.length ? `<div style="margin-top:6px">${sug.map((x, i) => `<div style="border-top:1px solid #fde68a;padding:5px 0">
-        <b>${esc(x.titulo)}</b>${x.autor ? ' — ' + esc(x.autor) : ''} <a class="ds-mini ds-sec" href="${esc(x.busca)}" target="_blank" rel="noopener" style="text-decoration:none">🔎 procurar na Amazon</a>
+        <b>${esc(x.titulo)}</b>${x.autor ? ' — ' + esc(x.autor) : ''}${x.editora ? ` <span class="ds-hint">(${esc(x.editora)})</span>` : ''} <a class="ds-mini ds-sec" href="${esc(x.busca)}" target="_blank" rel="noopener" style="text-decoration:none">🔎 procurar na Amazon</a>
+        ${IA.roteiros ? `<button class="ds-mini lvTrocar" data-i="${i}" style="background:#64748b;color:#fff" title="a IA pesquisa na internet um livro que EXISTE à venda no Brasil pra ficar no lugar deste">🔁 não achei — outro</button>` : ''}
         ${x.por_que ? `<div class="ds-hint">${esc(x.por_que)}</div>` : ''}${x.onde ? `<div class="ds-hint">📍 citar em: “${esc(x.onde)}”</div>` : ''}
         <div class="ds-row"><input class="lvLink" data-i="${i}" placeholder="cole aqui o SEU link de afiliado deste livro (link.amazon/…, amzn.to/… ou o link do SiteStripe)" style="flex:1;margin:0;font-size:.82rem"><button class="ds-mini lvUsar" data-i="${i}">➕ usar</button></div></div>`).join('')}</div>` : ''}
     <div class="ds-row" style="margin-top:4px"><input id="lvOutro" placeholder="ou cole o link de afiliado de outro livro" style="flex:1;margin:0;font-size:.82rem"><button class="ds-mini ds-sec" id="lvOutroBtn">➕ outro livro</button></div>
@@ -665,7 +666,7 @@ function livrosHtml(R) {
         return `<div style="display:flex;gap:8px;align-items:center;margin-top:4px">${m && m.url_arquivo ? `<img src="${esc(m.url_arquivo)}" style="height:56px;border-radius:3px">` : ''}
         <div style="flex:1;font-size:.84rem"><b>${esc(x.titulo_curto)}</b>${x.autor ? ' — ' + esc(x.autor) : ''}${x.preco ? ` <span class="ds-hint">${esc(x.preco)}</span>` : ''}${x.capa ? ` <span class="ds-id">${esc(x.capa)}</span>` : ' <span class="ds-hint">(sem capa)</span>'}
           <div class="ds-hint" style="word-break:break-all">${esc(x.link)}</div></div><button class="ds-mini ds-sec lvTirar" data-id="${esc(x.id)}" title="tirar">✕</button></div>`; }).join('')}
-      <div class="ds-row" style="margin-top:6px">${IA.roteiros ? `<button class="ds-mini" id="lvAdaptar" style="background:#4338ca;color:#fff">✍️ ${R.roteiro_com_livros ? 'Adaptar o roteiro de novo' : 'Adaptar o roteiro pra citar ' + (esc_.length > 1 ? 'os livros' : 'o livro')}</button>` : ''}
+      <div class="ds-row" style="margin-top:6px">${IA.roteiros ? `<button class="ds-mini" id="lvAdaptar" style="background:#4338ca;color:#fff" title="${R.roteiro_com_livros ? 'volta o roteiro pra versão SEM livros e cita os livros de novo (regras novas: nunca na abertura, sem inventar o que tem no livro, cada um num ponto)' : ''}">${R.roteiro_com_livros ? '🔁 Refazer: volta o roteiro sem livros e cita de novo' : '✍️ Adaptar o roteiro pra citar ' + (esc_.length > 1 ? 'os livros' : 'o livro')}</button>` : ''}
         ${tem2 ? `<span class="ds-hint">Versão em uso: <b>${L.ativo ? '📖 COM livros' : 'SEM livros'}</b></span><button class="ds-mini ds-sec" id="lvVersao" data-v="${L.ativo ? 'sem' : 'com'}">🔁 usar a versão ${L.ativo ? 'SEM' : 'COM'} livros</button>` : ''}</div>
       ${tem2 ? '<div class="ds-hint">Trocou de versão? Gere a voz de novo (as falas que não mudaram são reaproveitadas no multi voice).</div>' : ''}
       <div class="ds-row" style="margin-top:4px"><span class="ds-hint">Link do livro vai:</span><select id="lvDestino" style="width:auto;margin:0;padding:2px 6px;font-size:.82rem">${Object.entries(DESTINOS_LV).map(([k, v]) => `<option value="${k}" ${(L.destino || 'ambos') === k ? 'selected' : ''}>${v}</option>`).join('')}</select></div>
@@ -688,8 +689,12 @@ function ligarLivros(R) {
     try { feito(await api(`/modelos-video/${PID}/livros/link`, { link: link.trim(), sugerido: sug })); } catch (err) { erro(err); btn.disabled = false; } };
   document.querySelectorAll('.lvUsar').forEach(b => b.addEventListener('click', () => usar(document.querySelector(`.lvLink[data-i="${b.dataset.i}"]`).value, +b.dataset.i, b)));
   $('lvOutroBtn').addEventListener('click', (e) => usar($('lvOutro').value, null, e.target));
+  document.querySelectorAll('.lvTrocar').forEach(b => b.addEventListener('click', async () => { b.disabled = true; b.textContent = '⏳ procurando…';
+    st('🔁 a IA está pesquisando na internet um livro que existe no Brasil…');
+    try { feito(await api(`/modelos-video/${PID}/livros/trocar`, { i: +b.dataset.i })); } catch (err) { erro(err); b.disabled = false; b.textContent = '🔁 não achei — outro'; } }));
   document.querySelectorAll('.lvTirar').forEach(b => b.addEventListener('click', async () => { try { feito(await api(`/modelos-video/${PID}/livros/remover`, { id: b.dataset.id })); } catch (err) { erro(err); } }));
-  if ($('lvAdaptar')) $('lvAdaptar').addEventListener('click', async (e) => { e.target.disabled = true; st('✍️ a IA está achando o melhor momento pra citar…');
+  if ($('lvAdaptar')) $('lvAdaptar').addEventListener('click', async (e) => { e.target.disabled = true;
+    st(R.roteiro_com_livros ? '🔁 voltando o roteiro sem livros e citando de novo…' : '✍️ a IA está achando o melhor momento pra citar…');
     try { feito(await api(`/modelos-video/${PID}/livros/adaptar`, {})); } catch (err) { erro(err); e.target.disabled = false; } });
   if ($('lvVersao')) $('lvVersao').addEventListener('click', async (e) => { try { feito(await api(`/modelos-video/${PID}/livros/versao`, { versao: e.target.dataset.v })); } catch (err) { erro(err); } });
   if ($('lvDestino')) $('lvDestino').addEventListener('change', async (e) => { try { feito(await api(`/modelos-video/${PID}/livros/destino`, { destino: e.target.value })); } catch (err) { erro(err); } });

@@ -57,3 +57,52 @@ def test_v488_link_amazon_encurtado():
     import vendas as v
     assert v._eh_amazon("https://link.amazon/B0jjxqS7M") and v._eh_amazon("https://www.amazon.com.br/dp/1")
     assert not v._eh_amazon("https://amazon.evil.com/x")
+
+
+def test_v489_trocar_livro_nao_achado():
+    import livros_afiliado as la
+    p = {"tema": "pergunta armadilha", "resultado": {"roteiro": "texto do roteiro " * 50}}
+    lv = la.estado(p)
+    lv["sugeridos"] = [{"titulo": "Uma Introdução aos Argumentos", "autor": "Trudy Govier", "por_que": "ARG", "onde": "x"}]
+    pedidos = []
+
+    def falso(rec, system, conteudo, **kw):
+        pedidos.append((conteudo, kw))
+        return {"livros": [{"titulo": "A Arte de Argumentar", "autor": "Anthony Weston", "editora": "WMF Martins Fontes",
+                            "por_que": "p", "onde": ""}]}
+    novo = la.trocar(p, 0, chamar=falso)
+    assert novo["titulo"] == "A Arte de Argumentar" and novo["onde"] == "x" and novo["editora"]
+    assert "Trudy Govier" in pedidos[0][0] and pedidos[0][1]["web"] is True
+    assert la.estado(p)["nao_achados"] and la.estado(p)["sugeridos"][0]["titulo"] == "A Arte de Argumentar"
+
+
+def test_v490_autor_e_titulo_limpos_na_descricao():
+    import livros_afiliado as la
+    assert la.limpar_autor("Edição Português por Douglas N. Walton , Ana Lúcia R. Franco , Carlos A. L. Salum &amp; 1 mais") == "Douglas N. Walton"
+    assert la.limpar_autor("Arthur Schopenhauer (Autor), Fulano de Tal (Organizador)") == "Arthur Schopenhauer"
+    assert la.limpar_titulo("Informal Logic: A Pragmatic Approach – Edição Português") == "Informal Logic: A Pragmatic Approach"
+    res = {"livros": {"ativo": True, "destino": "ambos", "escolhidos": [
+        {"titulo_curto": "X &amp; Y", "autor": "por Ana &amp; 2 mais", "link": "https://link.amazon/a"}]}}
+    d = la.bloco_descricao(res)
+    assert "&amp;" not in d and "mais" not in d and "X & Y — Ana" in d
+
+
+def test_v491_livro_nao_entra_na_abertura():
+    import livros_afiliado as la
+    rot = "Abertura do vídeo com o gancho.\n\n" + ("Meio do vídeo com explicação. " * 40) + "\n\nFrase do meio onde cabe o livro.\n\n" + ("Mais texto. " * 40)
+    p = {"tema": "x", "resultado": {"roteiro": rot, "livros": {"escolhidos": [{"titulo_curto": "L", "autor": "A", "capa": "", "link": "https://amzn.to/x"}]}}}
+
+    def falso(rec, system, conteudo, **kw):
+        assert "NÃO INVENTE" in system
+        return {"trocas": [{"de": "Abertura do vídeo com o gancho.", "para": "Abertura. Leia L.", "livro": "L"},
+                           {"de": "Frase do meio onde cabe o livro.", "para": "Frase do meio. Pra ir mais fundo, tem L, de A.", "livro": "L"}]}
+    novo = la.adaptar(p, chamar=falso)
+    assert "Leia L" not in novo and "Pra ir mais fundo, tem L" in novo
+
+
+def test_v492_refazer_parte_da_versao_sem_livros():
+    import livros_afiliado as la
+    p = {"resultado": {"roteiro": "COM livro", "roteiro_sem_livros": "SEM livro", "livros": {"ativo": True}}}
+    assert la._roteiro_base(p) == "SEM livro"
+    p["resultado"].update(roteiro="SEM livro corrigido", livros={"ativo": False})
+    assert la._roteiro_base(p) == "SEM livro corrigido"

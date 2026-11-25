@@ -74,7 +74,9 @@ comissão pequena se alguém comprar). Leia o roteiro e responda com honestidade
   clássico que o vídeo cita, ou um livro acessível que aprofunda exatamente o tema. Nada genérico, nada só "relacionado".
 - 0 a 3 livros, do mais forte pro menos forte. Se o vídeo não tem livro que alguém compraria (tema do dia a dia, humor,
   fofoca, algo sem obra por trás), devolva "livros": [] e diga o porquê em "motivo" — não force.
-- Prefira edições que existem em português no Brasil. Título e autor como aparecem na capa.
+- SÓ livro que EXISTE à venda no Brasil, em português (com editora brasileira) — nunca um título traduzido por você,
+  nunca um livro que só existe em inglês. Na dúvida se existe edição brasileira, NÃO indique. Título, autor e editora
+  como aparecem na capa da edição brasileira.
 - "onde": a frase do roteiro (copiada letra por letra, curta) em que citar o livro cai NATURAL — onde a ideia dele
   aparece; nunca no gancho do começo nem no meio de um raciocínio que ainda não fechou.
 - "por_que": 1 frase do que o livro acrescenta pra quem assistiu (vai virar a menção no vídeo).
@@ -83,7 +85,7 @@ Responda SÓ o JSON."""
 
 def _schema_sugerir() -> Dict[str, Any]:
     from ia_midia import _S, _obj
-    item = _obj({"titulo": _S, "autor": _S, "por_que": _S, "onde": _S})
+    item = _obj({"titulo": _S, "autor": _S, "editora": _S, "por_que": _S, "onde": _S})
     return _obj({"vale_a_pena": {"type": "boolean"}, "motivo": _S, "livros": {"type": "array", "items": item}})
 
 
@@ -107,13 +109,57 @@ def sugerir(p: Dict[str, Any], chamar=None) -> Dict[str, Any]:
     livros = []
     for x in (d.get("livros") or [])[:MAX_LIVROS]:
         if isinstance(x, dict) and str(x.get("titulo") or "").strip():
-            lv = {k: " ".join(str(x.get(k) or "").split())[:300] for k in ("titulo", "autor", "por_que", "onde")}
+            lv = {k: " ".join(str(x.get(k) or "").split())[:300] for k in ("titulo", "autor", "editora", "por_que", "onde")}
             lv["busca"] = busca_amazon(lv)
             livros.append(lv)
     lv = estado(p)
     lv.update(sugeridos=livros, vale_a_pena=bool(d.get("vale_a_pena", bool(livros))) and bool(livros),
               motivo=" ".join(str(d.get("motivo") or "").split())[:400], sugerido_em=time.time())
     return lv
+
+
+def trocar(p: Dict[str, Any], i: int, chamar=None) -> Dict[str, Any]:
+    """🔁 v84_489: "não achei na Amazon" — a IA procura NA INTERNET um livro que existe no Brasil pra ficar no lugar do
+    sugerido i (e não sugere de novo nenhum dos que você não achou)."""
+    lv = estado(p)
+    sug = lv.get("sugeridos") or []
+    if not (0 <= i < len(sug)):
+        raise LivroErro("Sugestão não encontrada.")
+    nao = list(dict.fromkeys((lv.get("nao_achados") or []) + [f"{sug[i]['titulo']} — {sug[i].get('autor') or ''}".strip(" —")]))[-20:]
+    lv["nao_achados"] = nao
+    rot = _roteiro_base(p)
+    if not rot.strip():
+        raise LivroErro("Ainda não tem roteiro.")
+    import ia_servico as ia
+    chamar = chamar or ia.chamar
+    if chamar is ia.chamar:
+        motivo = ia.motivo_desligado("roteiros")
+        if motivo:
+            raise LivroErro("IA: " + motivo)
+    outros = [f"{x['titulo']} — {x.get('autor') or ''}" for j, x in enumerate(sug) if j != i] + \
+             [f"{x['titulo_curto']} — {x.get('autor') or ''}" for x in lv.get("escolhidos") or []]
+    conteudo = (f"Tema: {p.get('tema') or ''}\n\nO livro “{sug[i]['titulo']}” ({sug[i].get('autor') or ''}) NÃO foi achado na "
+                f"Amazon do Brasil. Indique UM livro no lugar dele, sobre o mesmo ponto do vídeo"
+                f"{(': ' + sug[i]['por_que']) if sug[i].get('por_que') else ''}.\n"
+                "PESQUISE NA INTERNET antes de responder e só indique um livro que você CONFIRMOU que está à venda em "
+                "português no Brasil (amazon.com.br, site da editora, Estante Virtual…). Dê a editora brasileira.\n"
+                f"NÃO indique nenhum destes (não achados): {'; '.join(nao)}.\n"
+                + (f"Nem estes (já estão na lista): {'; '.join(outros)}.\n" if outros else "")
+                + f"\nROTEIRO:\n{rot[:16000]}")
+    with ia.rotulo("📖 Outro livro: " + str(p.get("tema") or "")[:50]):
+        d = chamar("roteiros", SISTEMA_SUGERIR, conteudo, schema=_schema_sugerir(), max_tokens=2500, effort="medium",
+                   timeout=300, cache_local=False, web=True)
+    novos = [x for x in ((d or {}).get("livros") or []) if isinstance(x, dict) and str(x.get("titulo") or "").strip()] \
+        if isinstance(d, dict) else []
+    if not novos:
+        raise LivroErro("A IA não achou outro livro que exista no Brasil pra esse ponto" +
+                        (f": {d.get('motivo')}" if isinstance(d, dict) and d.get("motivo") else "."))
+    x = novos[0]
+    novo = {k: " ".join(str(x.get(k) or "").split())[:300] for k in ("titulo", "autor", "editora", "por_que", "onde")}
+    novo["onde"] = novo["onde"] or sug[i].get("onde") or ""
+    novo["busca"] = busca_amazon(novo)
+    sug[i] = novo
+    return novo
 
 
 # ------------------------------------------------------------------ 2. o link de afiliado → dados + capa
@@ -136,7 +182,7 @@ def ler_link(link: str, baixar=None, ler=None) -> Dict[str, Any]:
     if m:
         autor = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", m.group(1))).strip()
         autor = re.sub(r"\((Autor|Author|Tradutor|Translator)[^)]*\)|Formato:.*$|Seguir", "", autor).strip(" ,|")[:120]
-    return {"titulo": titulo[:200], "autor": autor, "preco": d.get("preco") or "", "capa_url": (d.get("imagens") or [""])[0],
+    return {"titulo": limpar_titulo(titulo), "autor": limpar_autor(autor), "preco": d.get("preco") or "", "capa_url": (d.get("imagens") or [""])[0],
             "url_final": final or link}
 
 
@@ -187,6 +233,12 @@ Regras — a menção tem que somar, nunca parecer anúncio:
   começo nem cortando um raciocínio. Diga título e autor do jeito que se fala ("como Camus escreve em O Mito de Sísifo…",
   "isso está todo em ‘O Mito de Sísifo’, do Camus"). Pode dizer por que vale ler em meia frase. Nada de "compre", "link",
   "promoção", "patrocinado", nada de preço.
+- NUNCA no primeiro parágrafo nem na abertura/tese (os primeiros ~15% do roteiro): ali o espectador ainda está decidindo
+  se fica — livro ali parece anúncio.
+- NÃO INVENTE o que tem dentro do livro: não diga que ele "explica X", "traz as condições Y", "mostra o conceito Z" — a não
+  ser que o livro seja a OBRA DE ONDE a ideia vem (o autor da teoria). Pros outros, menção de aprofundamento sem afirmar
+  conteúdo: "pra quem quiser ir mais fundo nesse assunto, tem ‘Título’, de Autor".
+- Livros diferentes em pontos DIFERENTES do vídeo (nunca dois na mesma parte).
 - Logo ANTES da frase da menção, ponha a marca da capa (ex.: [I7]) — é a imagem da capa entrando na tela nessa hora.
 - No FIM do roteiro (perto da despedida, junto do aviso de que as fontes estão na descrição, se houver), UMA frase:
   os livros citados estão na descrição (ex.: "Os livros que eu citei estão na descrição, se você quiser ir mais fundo.").
@@ -198,7 +250,10 @@ Responda SÓ o JSON: {"trocas": [{"de": "...", "para": "...", "livro": "título"
 
 
 def _roteiro_base(p: Dict[str, Any]) -> str:
+    """O roteiro SEM livros. 🔁 v84_492: se a versão em uso é a SEM livros, vale ela (pode ter recebido correções depois)."""
     res = p.get("resultado") or {}
+    if not ((res.get("livros") or {}).get("ativo")) and str(res.get("roteiro") or "").strip():
+        return str(res["roteiro"])
     return str(res.get("roteiro_sem_livros") or res.get("roteiro") or "")
 
 
@@ -231,6 +286,10 @@ def adaptar(p: Dict[str, Any], chamar=None) -> str:
     trocas = [t for t in (d or {}).get("trocas") or [] if isinstance(t, dict) and str(t.get("de") or "").strip()]
     if not trocas:
         raise LivroErro("A IA não devolveu onde citar os livros (veja em 🤖 IA).")
+    corte = int(len(base_rot) * 0.12)  # 📖 v84_491: nada de livro na abertura (a IA às vezes punha no 1º parágrafo)
+    trocas = [t for t in trocas if not (0 <= base_rot.find(t["de"].strip()[:80]) < corte)] or trocas[:0]
+    if not trocas:
+        raise LivroErro("A IA só achou lugar pra citar o livro na abertura do vídeo (parece anúncio) — tente de novo.")
     r = rv.aplicar(base_rot, json.dumps({"trocas": [{"de": t["de"], "para": t.get("para") or "", "motivo": "📖 livro"}
                                                     for t in trocas]}, ensure_ascii=False))
     if not r["aplicadas"]:
@@ -243,8 +302,40 @@ def adaptar(p: Dict[str, Any], chamar=None) -> str:
 
 
 # ------------------------------------------------------------------ 4. descrição e comentário fixado
+def limpar_autor(autor: str) -> str:
+    """🧹 v84_490: o "byline" da Amazon vem sujo — "Edição Português por Douglas N. Walton , Ana Lúcia R. Franco , Carlos
+    A. L. Salum &amp; 1 mais" → "Douglas N. Walton" (o autor; tradutores e o "& 1 mais" saem)."""
+    import html as _html
+    a = _html.unescape(_html.unescape(str(autor or "")))
+    a = re.sub(r"\bEdi[çc][ãa]o\s+(?:em\s+)?(?:Portugu[êe]s|Ingl[êe]s|Espanhol|Franc[êe]s|[A-Za-zÀ-ú]+)\b", " ", a, flags=re.I)
+    # tradutor/organizador/prefácio SAEM com o nome (só o autor fica); "(Autor)" sai só a marca
+    a = re.sub(r"[^,()&]*\((?:Tradutor|Tradutora|Tradução|Translator|Organizador|Organizadora|Org\.?|Editor|Editora|"
+               r"Ilustrador|Ilustradora|Prefácio|Prefaciador|Introdução|Notas|Revisão|Coordenador)[^)]*\)", " ", a, flags=re.I)
+    a = re.sub(r"\((?:Autor|Autora|Author)[^)]*\)", " ", a, flags=re.I)
+    a = re.sub(r"(?:&|\be\b|\band\b)\s*\d+\s*(?:mais|more)\b", " ", a, flags=re.I)
+    a = re.sub(r"^\s*(?:por|by|de)\s+", "", re.sub(r"\s+", " ", a).strip(), flags=re.I)
+    a = re.sub(r"\s+,", ",", a).strip(" ,;|–—-")
+    nomes = [n.strip() for n in re.split(r",|\s&\s|\se\s(?=[A-ZÀ-Ú])", a) if n.strip()]
+    if len(nomes) > 2:  # 3+ nomes = autor + tradutores/organizadores: fica o 1º
+        return nomes[0][:120]
+    return " e ".join(nomes)[:120]
+
+
+def limpar_titulo(titulo: str) -> str:
+    import html as _html
+    t = _html.unescape(_html.unescape(str(titulo or "")))
+    t = re.sub(r"\s*[–—-]\s*Edi[çc][ãa]o\s+[A-Za-zÀ-ú]+.*$", "", t, flags=re.I)
+    return re.sub(r"\s+", " ", t).strip()[:200]
+
+
 def _linhas(livros: List[Dict[str, Any]]) -> List[str]:
-    return [f"- {x['titulo_curto']}{' — ' + x['autor'] if x.get('autor') else ''}: {x['link']}" for x in livros if x.get("link")]
+    out = []
+    for x in livros:
+        if not x.get("link"):
+            continue
+        tit, aut = limpar_titulo(x.get("titulo_curto") or x.get("titulo") or ""), limpar_autor(x.get("autor") or "")
+        out.append(f"- {tit}{' — ' + aut if aut else ''}: {x['link']}")
+    return out
 
 
 def bloco_descricao(res: Dict[str, Any]) -> str:
