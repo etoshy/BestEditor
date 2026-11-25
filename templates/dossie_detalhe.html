@@ -659,7 +659,7 @@ function livrosHtml(R) {
     ${sug.length ? `<div style="margin-top:6px">${sug.map((x, i) => `<div style="border-top:1px solid #fde68a;padding:5px 0">
         <b>${esc(x.titulo)}</b>${x.autor ? ' — ' + esc(x.autor) : ''} <a class="ds-mini ds-sec" href="${esc(x.busca)}" target="_blank" rel="noopener" style="text-decoration:none">🔎 procurar na Amazon</a>
         ${x.por_que ? `<div class="ds-hint">${esc(x.por_que)}</div>` : ''}${x.onde ? `<div class="ds-hint">📍 citar em: “${esc(x.onde)}”</div>` : ''}
-        <div class="ds-row"><input class="lvLink" data-i="${i}" placeholder="cole aqui o SEU link de afiliado deste livro (amzn.to/… ou o link do SiteStripe)" style="flex:1;margin:0;font-size:.82rem"><button class="ds-mini lvUsar" data-i="${i}">➕ usar</button></div></div>`).join('')}</div>` : ''}
+        <div class="ds-row"><input class="lvLink" data-i="${i}" placeholder="cole aqui o SEU link de afiliado deste livro (link.amazon/…, amzn.to/… ou o link do SiteStripe)" style="flex:1;margin:0;font-size:.82rem"><button class="ds-mini lvUsar" data-i="${i}">➕ usar</button></div></div>`).join('')}</div>` : ''}
     <div class="ds-row" style="margin-top:4px"><input id="lvOutro" placeholder="ou cole o link de afiliado de outro livro" style="flex:1;margin:0;font-size:.82rem"><button class="ds-mini ds-sec" id="lvOutroBtn">➕ outro livro</button></div>
     ${esc_.length ? `<div style="margin-top:6px"><b style="font-size:.86rem">Escolhidos (${esc_.length}):</b>${esc_.map(x => { const m = mid(x.capa);
         return `<div style="display:flex;gap:8px;align-items:center;margin-top:4px">${m && m.url_arquivo ? `<img src="${esc(m.url_arquivo)}" style="height:56px;border-radius:3px">` : ''}

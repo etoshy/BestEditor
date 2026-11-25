@@ -51,3 +51,9 @@ def test_rotas(proj):
     # encolher demais = não aplica
     corta = json.dumps({"correcoes": [{"tipo": "repeticao", "de": "Uma frase qualquer sobre perguntas. " * 50, "para": ""}]})
     assert c.post(f"/qualidade/dossie/{p['id']}/ler", json={"texto": corta}).status_code == 400
+
+
+def test_v488_link_amazon_encurtado():
+    import vendas as v
+    assert v._eh_amazon("https://link.amazon/B0jjxqS7M") and v._eh_amazon("https://www.amazon.com.br/dp/1")
+    assert not v._eh_amazon("https://amazon.evil.com/x")

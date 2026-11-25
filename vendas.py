@@ -205,7 +205,10 @@ def _checar_url(url: str) -> str:
 
 def _eh_amazon(url: Any) -> bool:
     host = urlparse(str(url or "")).netloc.lower()
-    return bool(re.search(r"(^|\.)amazon\.[a-z.]+$|(^|\.)amzn\.(to|com|eu|asia)$|(^|\.)a\.co$", host))
+    # 🔗 v84_488: + o encurtador novo do SiteStripe (https://link.amazon/…) — o domínio ".amazon" é da própria Amazon
+    # (e "amazon.qualquercoisa.com" não passa mais: só amazon.<país>, como amazon.com.br / amazon.de / amazon.co.uk)
+    return bool(re.search(r"(^|\.)amazon\.(?:com|co|[a-z]{2})(?:\.[a-z]{2})?$|(^|\.)amazon$|(^|\.)amzn\.(to|com|eu|asia)$"
+                          r"|(^|\.)a\.co$", host))
 
 
 def _pagina_bloqueada(html: str) -> bool:

@@ -54,7 +54,7 @@ def com_tag(link: str, tag: str = "") -> str:
         return link
     u = urlparse(link)
     if not re.search(r"(^|\.)amazon\.", u.netloc or ""):
-        return link  # link curto (amzn.to) já vem com a tag de quem gerou
+        return link  # link curto (amzn.to, link.amazon) já vem com a tag de quem gerou
     q = dict(parse_qsl(u.query))
     if q.get("tag"):
         return link
