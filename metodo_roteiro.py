@@ -404,6 +404,9 @@ def bloco_tamanho(minutos: float, palavras: int, partes: List[str] = None, reesc
     if reescrita:
         L.append("- Se o vídeo original for mais curto que isso, expanda com mais explicação e contexto sobre o mesmo assunto "
                  "(sem inventar fatos). Se for mais longo, condense mantendo o essencial.")
+    L.append("- 🧱 O tamanho vem de CONTEÚDO NOVO — mais pontos da fonte, a explicação do porquê, um exemplo de OUTRA área, "
+             "a objeção e a resposta, um caso/estudo real — NUNCA de reexplicar com outras palavras ou outro exemplo o que já "
+             "foi dito. Se perceber que vai repetir, puxe o próximo ponto da fonte.")
     L.append("- Este tamanho vale mais do que o tamanho de qualquer referência ou exemplo acima.")
     L.append("- Antes de responder, estime as palavras do roteiro; se ficou abaixo do mínimo, continue escrevendo até chegar. "
              "Se precisar economizar espaço na resposta, encurte os OUTROS campos do JSON — nunca o roteiro.")
@@ -440,6 +443,9 @@ def prompt_completar(roteiro: str, palavras: int, alvo_palavras: int, minutos: f
          "",
          "Reescreva o roteiro COMPLETO, do começo ao fim, chegando nesse tamanho:",
          "- mantenha a história, a ordem, o tom, o gancho e o final; NÃO resuma nada do que já existe;",
+         "- 🧱 o que entra é CONTEÚDO NOVO: pontos da fonte que o roteiro ainda NÃO usou, o porquê mais a fundo, a objeção, "
+         "um caso real; é PROIBIDO reexplicar uma ideia que o roteiro já explicou (com outras palavras ou outro exemplo) e "
+         "PROIBIDO criar um exemplo que seja variação de um que já está lá;",
          "- aprofunde cada parte com mais contexto, detalhes e fatos das MESMAS fontes que eu te passei nesta conversa "
          "(se esta for uma conversa nova, use só o que está no roteiro e não invente fatos), causas e consequências, "
          "o que as pessoas disseram, e transições melhores — sem repetir frases pra encher;",

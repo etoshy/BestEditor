@@ -57,7 +57,7 @@ def test_v472_regras_sem_caso_especifico():
 
 def test_v473_completar_proprios():
     import dossies as ds
-    assert any("exemplos NOVOS" in r for r in ds.REGRAS_COMPLETAR_PROPRIOS)
+    assert any("UM exemplo novo por ideia" in r for r in ds.REGRAS_COMPLETAR_PROPRIOS)
     import inspect, temas_bruto_rotas
     src = inspect.getsource(temas_bruto_rotas)
     assert "_completar_tamanho(aid, tid, pid, t)" in src and "prompt-completar" in src
@@ -103,3 +103,12 @@ def test_v476_um_video_so_e_criterio(tmp_path, monkeypatch):
     assert tb.analisar(str(tmp_path), a["id"]) == 1
     t = tb.carregar(str(tmp_path), a["id"])["temas"][0]
     assert t["titulo"] == "T3" and "T1" in t["pontos"] and "p1" in t["pontos"]
+
+
+def test_v478_sem_repeticao():
+    import dossies as ds
+    import metodo_roteiro as mr
+    assert "CADA IDEIA É EXPLICADA UMA VEZ" in ds.REGRA_FALA
+    assert "CONTEÚDO NOVO" in mr.bloco_tamanho(15, 2250)
+    assert "PROIBIDO reexplicar" in mr.prompt_completar("x " * 100, 100, 2250, 15)
+    assert "IDEIAS DISTINTAS" in tb.system_analise({"modelo": "raciocinio_maldito", "divisao": ""}, "x")

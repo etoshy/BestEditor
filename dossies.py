@@ -566,7 +566,10 @@ REGRA_FALA = (
     "e referências do vídeo — e qualquer correção, se aparecer — estão na descrição (ex.: \"as fontes que usei estão na "
     "descrição, e se algo precisar de correção, é lá que ela vai estar\"); só uma vez no vídeo. "
     "EXEMPLO DO DIA A DIA NÃO SE REPETE: a mesma situação (o amigo de anos, a porta trancada…) entra UMA vez; para a "
-    "próxima ideia, use outra situação. "
+    "próxima ideia, use outra situação — e VARIAÇÕES da mesma situação contam como a mesma (dois exemplos de \"atraso no "
+    "trabalho\", um do relatório e outro da reunião, são UM exemplo repetido). "
+    "CADA IDEIA É EXPLICADA UMA VEZ: depois de explicada, ela só volta numa frase (pra ligar com a próxima) — nunca "
+    "reexplicada com outro exemplo em outra parte. Cada parte do vídeo tem que trazer algo que o espectador ainda NÃO ouviu. "
     "CITAÇÃO NA FALA: autor + obra (ex.: \"Louis Lavelle, em A Intimidade Espiritual\") — sem ano, página, edição ou nome "
     "do capítulo/ensaio; esses detalhes vão nas fontes da descrição. "
     "ANALOGIA tem que fechar: uma comparação só entra se for clara na primeira ouvida (quem, o quê, por que é parecido); "
@@ -1772,12 +1775,11 @@ def prompt_completar(p: Dict[str, Any]) -> str:
 # 🧠 v84_473: no canal de exemplos do zero a fonte só tem as IDEIAS (as histórias da aula saíram) — o tamanho vem de
 # aprofundar cada ideia com exemplos novos, aplicações e os estudos reais, não de "mais fatos da fonte".
 REGRAS_COMPLETAR_PROPRIOS = [
-    "neste canal a fonte traz só as IDEIAS: aprofunde CADA ideia com exemplos NOVOS criados do zero (cenas do dia a dia, "
-    "assumidas como hipotéticas: \"imagine alguém que…\"), cada um mostrando o mecanismo de um jeito diferente "
-    "(trabalho, relacionamento, celular, comida, dinheiro, estudo…);",
-    "explique o PORQUÊ de cada mecanismo passo a passo (o que acontece no cérebro/na cabeça, em linguagem simples), as "
-    "objeções que o espectador faria e a resposta, os limites (quando a ideia não vale) e como aplicar na vida — com um "
-    "pequeno exercício pro espectador testar;",
+    "neste canal a fonte traz só as IDEIAS: primeiro use os pontos da fonte que o roteiro ainda NÃO cobriu; depois "
+    "aprofunde o PORQUÊ de cada mecanismo passo a passo (em linguagem simples), a objeção que o espectador faria e a "
+    "resposta, os limites (quando a ideia não vale) e um pequeno exercício pro espectador testar;",
+    "UM exemplo novo por ideia (no máximo), criado do zero e de uma área da vida que o roteiro ainda não usou — nunca um "
+    "segundo exemplo pra uma ideia que já tem o dela;",
     "estudos, autores e experimentos só os REAIS e conhecidos (nunca invente nome, número ou resultado); "
     "NUNCA use as histórias, casos ou exemplos da fonte original;",
 ]

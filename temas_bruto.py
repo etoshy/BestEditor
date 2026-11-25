@@ -487,7 +487,9 @@ Sua tarefa: separar os TEMAS que rendem, cada um, UM vídeo que se sustenta sozi
   que encarna o tema (pode vir de fora do texto, se for conhecido e verdadeiro).
 {(REGRA_SO_IDEIA_TEMAS + REGRA_LISTAR_HISTORIAS) if _so_ideias(a) else ""}- "formato": a chave do formato do modelo que melhor combina:
 {fmts}
-- "minutos": a duração IDEAL do vídeo, pelo tanto que o texto rende sobre o tema (sem enrolação), em geral entre
+- "minutos": conte as IDEIAS DISTINTAS que o texto dá a este tema (cada uma rende ~1,5 a 2 min com explicação e um
+  exemplo) — 4 ideias ≈ 7 min, 8 ideias ≈ 14 min. Tema de 3 ou 4 ideias NÃO vira vídeo de 15 min (vira repetição): junte
+  com o tema vizinho ou diminua os minutos. A duração IDEAL, pelo tanto que o texto rende sobre o tema (sem enrolação), em geral entre
   {faixa_minutos(a)[0]} e {faixa_minutos(a)[1]} min. Shorts = 1.
 - "de_onde": de que partes do texto o vídeo tira o material (ex.: "começo da aula + exemplo do meio + conclusão do fim").
 - "por_que_tempo": a justificativa do tempo em uma frase (ex.: "um exercício prático + duas bases filosóficas").

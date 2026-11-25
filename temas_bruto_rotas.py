@@ -130,10 +130,12 @@ def registrar(app, base_dir: str, transcricoes_dir: str = "", jobs_transcricao=N
             minutos, alvo, _ppm = ds.alvo_tamanho(p)
             res = p.get("resultado") or {}
             tem = metodo_roteiro.palavras_do_texto(res.get("roteiro_final") or res.get("roteiro") or "")
-            if minutos <= 1 or not alvo or tem >= alvo * metodo_roteiro.TOLERANCIA_TAMANHO:
+            # 🧱 v84_478: só completa quando ficou MUITO curto (< 65%) — esticar o que já está perto do alvo virava
+            # repetição (a mesma ideia reexplicada com outro exemplo). E no máximo 1 vez.
+            if minutos <= 1 or not alvo or tem >= alvo * 0.65 or vez > 1:
                 return
             _estado(aid, tid, "roteiro", f"📏 o roteiro ficou curto ({tem} de ~{alvo} palavras) — a IA está aprofundando "
-                                         f"({vez}/2)…")
+                                         "…")
             try:
                 pr = _post(f"/modelos-video/{pid}/prompt-completar")["prompt"]
                 fonte = "\n\n".join(str(f.get("texto") or "") for f in p.get("fontes") or []
