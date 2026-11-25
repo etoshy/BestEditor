@@ -681,6 +681,10 @@ _BASTIDOR = [
      lambda m: "que faltava quando falamos d" + m.group(1).lower()),
     (re.compile(r"\bque faltava na conversa anterior sobre\b", re.I), "que faltava quando falamos de"),
     (re.compile(r"\bonde a (?:conversa |parte )?anterior parou\b", re.I), "onde a gente parou"),
+    # ✍ v84_493: sobras de correção / bastidor
+    (re.compile(r"\s*Trata-se de um exemplo hipotético para ilustrar a estrutura\.", re.I), ""),
+    (re.compile(r"\bEssa é a ponte que liga o assunto anterior a este:\s*", re.I), ""),
+    (re.compile(r"\bque o título do vídeo quer (?:nos )?ensinar a fazer\b", re.I), "que importa aqui"),
     (re.compile(r"\b(?:na|da) conversa anterior\b", re.I), "agora há pouco"),
     (re.compile(r"\bEu sou o narrador,? e (este|esse) é\b"), lambda m: m.group(1).capitalize() + " é"),
     (re.compile(r"\s*\bEu sou o narrador\.\s*"), " "),

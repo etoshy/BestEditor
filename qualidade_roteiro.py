@@ -24,6 +24,7 @@ TIPOS = {
     "faltou": "➕ faltou do mapa",
     "fechamento": "🔚 fechamento",
     "chamada": "📣 chamada",
+    "emenda": "🧵 emenda de correção",
 }
 MAX_CORRECOES = 30
 
@@ -54,7 +55,12 @@ def prompt(roteiro: str, tema: str = "", fonte: str = "", mapa: str = "", idioma
          "8. faltou — ponto do MAPA abaixo que o roteiro não cobriu (ou só citou de passagem): escreva o trecho que falta, "
          "no lugar certo da ordem.",
          "9. fechamento — conceito novo que aparece só no fim, duas conclusões seguidas, pergunta ao público incompleta.",
-         "10. chamada — mais de uma pergunta \"comenta aí\" espalhada, ou a última ficou sem a pergunta.", ""]
+         "10. chamada — mais de uma pergunta \"comenta aí\" espalhada, ou a última ficou sem a pergunta.",
+         "11. emenda — o roteiro já passou por correções automáticas, que às vezes deixam COSTURAS: um pedaço de outro "
+         "assunto enxertado no meio de um parágrafo (ex.: lógica × retórica no meio do exemplo do trânsito), a sobra de um "
+         "exemplo que foi tirado (\"o júri se comove…\" sem júri nenhum antes), um \"A primeira é…\" cuja lista sumiu, a "
+         "mesma frase duas vezes no mesmo parágrafo, dois \"Por isso\" seguidos, aviso desnecessário (\"trata-se de um "
+         "exemplo hipotético\" numa simples analogia). Leia parágrafo por parágrafo procurando isso.", ""]
     if mapa.strip():
         L += ["## MAPA do vídeo (o que ele tem de cobrir)", mapa.strip()[:2000], ""]
     L += ["## Como responder — SÓ um JSON, sem texto antes ou depois",
