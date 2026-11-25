@@ -66,6 +66,11 @@ def prompt(roteiro: str, tema: str = "", fonte: str = "", mapa: str = "", idioma
           "- \"para\": o texto que entra no lugar, no mesmo tom e idioma, pronto pra ser narrado. Pra INSERIR conteúdo "
           "(tipo \"faltou\"), \"de\" = a última frase do parágrafo antes de onde ele entra, e \"para\" = essa mesma frase + "
           "\\n\\n + o parágrafo novo.",
+          "- APAGOU ou trocou um parágrafo? Confira o parágrafo SEGUINTE: se ele começa apontando pro que saiu (\"Essa "
+          "separação…\", \"Isso…\", \"Também…\", um exemplo que só tinha sido apresentado no trecho apagado), corrija ele "
+          "também (outra correção) — nenhuma correção pode criar uma referência órfã nova.",
+          "- Confira as DEFINIÇÕES do roteiro contra a fonte, uma por uma (ex.: o que é resposta direta, indireta, réplica) — "
+          "definição que não bate com a fonte é conceito_errado, mesmo que soe bem.",
           "- Mantenha todas as marcas que estiverem no \"de\" ([I3], [M2], [CENA 2], [[INSCREVA]], [[VENDA]], tags de voz).",
           f"- No máximo {MAX_CORRECOES} correções — as mais importantes primeiro. Roteiro sem erro = \"correcoes\": [].",
           "- Exemplo novo: criado do zero, plausível e de uma área da vida que o roteiro ainda não usou.",
