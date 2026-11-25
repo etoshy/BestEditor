@@ -264,7 +264,45 @@ TRUE_CRIME: Dict[str, Any] = {
     "referencia": {"estilo": "documentário de caso (true crime)", "plano_s": [4, 6]},
 }
 
-DIRECOES: List[Dict[str, Any]] = [MISTERE, DOSSIE_PAPEL, DALLAS, PROPAGANDA, TRUE_CRIME]
+# ------------------------------------------------------------------ Raciocínio Maldito (v84_494)
+# Ensaio de psicologia/lógica narrado: o que segura é a IDEIA, então a edição não compete com a voz. Imagem escura e
+# limpa, câmera respirando devagar (~5–7 s por plano), corte seco ou fade pro preto, nada de glitch, flash ou "whoosh".
+# SEM EFEITO SONORO: nenhum som nas transições (som_transicoes = "nenhum") e nenhum destaque com som (sfx_*).
+# Texto na tela só onde ajuda a pensar: a pergunta/tese, o nome do conceito, a definição curta, o número.
+RACIOCINIO_MALDITO: Dict[str, Any] = {
+    "id": "sys_raciocinio_maldito",
+    "nome": "Raciocínio Maldito (ensaio de psicologia, sem efeito sonoro)",
+    "descricao": "Ensaio narrado de psicologia e lógica: imagem escura e limpa, câmera respirando devagar, corte seco ou "
+                 "fade pro preto, nada de glitch nem flash; texto na tela só pro conceito, a pergunta e o número. Sem "
+                 "efeito sonoro nenhum — a voz manda.",
+    "sistema": True, "v": 3, "intensidade": None, "conjuntos": {}, "ritmo": "calmo", "marca": None, "universo": "predef",
+    "cores": {"ativa": True, "modo": "predef", "primaria": "#F4F1EA", "secundaria": "#0E0E12", "acento": "#8E2C3A"},
+    "filtros": {"pct": 75, "itens": [{"id": "documentary", "peso": 3}, {"id": "matte", "peso": 2}, {"id": "noir_soft", "peso": 2},
+                                     {"id": "cinematic", "peso": 1}]},
+    "efeitos": {"pct": 70, "itens": [
+        {"id": "zoom_respiro", "peso": 5}, {"id": "zoom_in", "peso": 2}, {"id": "ken_burns_doc", "peso": 2},
+        {"id": "pan_dir", "peso": 1}, {"id": "pan_baixo", "peso": 1},
+        {"id": "vinheta_suspense", "peso": 2}, {"id": "ov_poeira", "peso": 1}, {"id": "grao_16mm", "peso": 1}]},
+    "transicoes": {"pct": 15, "itens": [
+        {"id": "fadeblack", "peso": 3}, {"id": "corte_pro_preto_doc", "peso": 3}, {"id": "gl_fade_escuro", "peso": 2},
+        {"id": "errol_morris_corte", "peso": 1}]},
+    "entradas": {"pct": 10, "itens": [{"id": "foto_arquivo_lenta", "peso": 3}, {"id": "ken_burns_foto", "peso": 2},
+                                      {"id": "revela_documento", "peso": 1}]},
+    "saidas": {"pct": 0, "itens": []},
+    "templates": {"pct": 5, "itens": [{"id": "ED_CITACAO", "peso": 3}, {"id": "ED_COMPARACAO", "peso": 1}]},
+    "templatesAvatar": {"pct": 0, "itens": []},
+    "overlays": {"pct": 0, "itens": [], "maxPorCena": 1},
+    "pares": {"modo": "livre", "itens": []},
+    "legenda": None,
+    "destaques": {"ativo": True, "densidade": "minimal", "estilos": [
+        "branco", "capitulo", "estat", "doc_lower", "gancho_frio", "dossie_maquina_escrever"]},
+    "editoriais": {"ativo": True, "densidade": "minimal", "tipos": ["reescrita", "numero", "nome", "titulo_video", "pagina"]},
+    "som_transicoes": "nenhum",
+    "sem_efeito_sonoro": True,
+    "referencia": {"estilo": "ensaio narrado de psicologia (Raciocínio Maldito)", "plano_s": [5, 7]},
+}
+
+DIRECOES: List[Dict[str, Any]] = [MISTERE, DOSSIE_PAPEL, DALLAS, PROPAGANDA, TRUE_CRIME, RACIOCINIO_MALDITO]
 
 # o mínimo que uma direção precisa ter (as que vêm de um pacote de canal são completadas com isto)
 _BASE_DIRECAO: Dict[str, Any] = {

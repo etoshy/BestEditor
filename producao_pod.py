@@ -883,8 +883,25 @@ def _materiais_do_modelo(it: Dict[str, Any], cenas: List[Dict[str, Any]]) -> Dic
         momentos = (p.get("resultado") or {}).get("momentos") or []
         ms = {m["id"].upper(): m for m in dossies.midias_para_editor(_BASE, p)}
         por_cena = cenas_lote.cenas_dos_momentos(cenas, [mo for mo in momentos if str(mo.get("midia") or "").upper() in ms])
-        return {i: {"id": mid, "tipo": ms[mid]["tipo"], "provider": "material", "caminho": ms[mid].get("caminho") or ""}
-                for i, mid in por_cena.items()}
+        out = {i: {"id": mid, "tipo": ms[mid]["tipo"], "provider": "material", "caminho": ms[mid].get("caminho") or ""}
+               for i, mid in por_cena.items()}
+        # 📖 v84_494: a CAPA do livro citado entra SEMPRE (mesmo com 100% no pod / canal que redesenha as fotos) e, se a
+        # marca [I…] não foi achada na fala, a cena é achada pelo título do livro
+        res = p.get("resultado") or {}
+        lv = res.get("livros") or {}
+        if lv.get("ativo"):
+            for livro in lv.get("escolhidos") or []:
+                cid = str(livro.get("capa") or "").upper()
+                if not cid or cid not in ms:
+                    continue
+                cena = next((i for i, x in out.items() if x["id"] == cid), None)
+                if cena is None:
+                    cena = cenas_lote.cena_do_texto(cenas, livro.get("titulo_curto") or livro.get("titulo") or "")
+                if cena is None:
+                    continue
+                out[cena] = {"id": cid, "tipo": ms[cid]["tipo"], "provider": "material", "caminho": ms[cid].get("caminho") or "",
+                             "livro": True}
+        return out
     except Exception:  # noqa: BLE001 — modelo apagado etc.: segue sem as fotos
         return {}
 
@@ -1026,8 +1043,9 @@ def _planejar_padrao(lid: str, iid: str, it: Dict[str, Any], cfg_lote: Dict[str,
     alt: Dict[int, Dict[str, str]] = {}
     if materiais and pct >= 1:
         # 🖼 v84_223: 100% = TODA cena no pod, mesmo a que tem foto real marcada no roteiro (a foto fica anotada na
-        # cena pra você usar no editor, se quiser)
-        alt, materiais = materiais, {}
+        # cena pra você usar no editor, se quiser) — menos a capa do livro citado (📖 v84_494)
+        alt = {i: x for i, x in materiais.items() if not x.get("livro")}
+        materiais = {i: x for i, x in materiais.items() if x.get("livro")}
         _mudar(lid, iid, _log=f"🖼 100%: {len(alt)} cena(s) com foto do roteiro também vão pro pod (a foto fica de alternativa)")
     if materiais:
         _mudar(lid, iid, _log=f"🕵️ {len(materiais)} cenas com as fotos do modelo de vídeo (marcas [I…] do roteiro)")
@@ -1088,11 +1106,13 @@ def _planejar_canal(lid: str, iid: str, it: Dict[str, Any], cfg_lote: Dict[str, 
     materiais = _materiais_do_modelo(it, cenas)
     # 📷 fotos marcadas no roteiro: canal 100% IA → viram referência e saem redesenhadas; vídeos entram como estão
     fotos_ref = {i: x["caminho"] for i, x in materiais.items()
-                 if ccfg["fotos_do_roteiro"] == "referencia" and x.get("tipo") == "foto" and x.get("caminho")}
+                 if ccfg["fotos_do_roteiro"] == "referencia" and x.get("tipo") == "foto" and x.get("caminho")
+                 and not x.get("livro")}  # 📖 a capa do livro não é redesenhada
     materiais = {i: x for i, x in materiais.items() if i not in fotos_ref}
     alt: Dict[int, Dict[str, str]] = {}
     if materiais and ccfg["pct"] >= 100:  # 🖼 v84_223: 100% = toda cena no pod (a foto/vídeo fica de alternativa)
-        alt, materiais = materiais, {}
+        alt = {i: x for i, x in materiais.items() if not x.get("livro")}
+        materiais = {i: x for i, x in materiais.items() if x.get("livro")}  # 📖 a capa do livro fica
     if fotos_ref:
         _mudar(lid, iid, _log=f"📷 {len(fotos_ref)} foto(s) marcada(s) no roteiro vão de referência e saem no estilo do canal")
     if materiais:

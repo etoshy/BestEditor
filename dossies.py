@@ -468,6 +468,7 @@ MODELOS: Dict[str, Dict[str, Any]] = {
                 "Pergunta"]},
         },
         "chamadas": {"inscreva": 2, "venda": 1},  # ✍ v84_480: saíam 3 [[VENDA]] num vídeo de 17 min
+        "direcao_sugerida": "sys_raciocinio_maldito",  # 🎬 v84_494: direção do editor do canal (sem efeito sonoro)
         "exemplos_proprios": True,  # v84_467: a aula dá a IDEIA; os exemplos são criados do zero
         # 🧠 v84_476: o que rende vídeo NESTE canal (o público é leigo, não estudante de psicologia/neuro)
         "criterio_temas": ("- NESTE CANAL o público é LEIGO e curioso sobre a própria cabeça: tema = medo, vício, culpa, "

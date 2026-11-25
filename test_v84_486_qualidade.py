@@ -106,3 +106,31 @@ def test_v492_refazer_parte_da_versao_sem_livros():
     assert la._roteiro_base(p) == "SEM livro"
     p["resultado"].update(roteiro="SEM livro corrigido", livros={"ativo": False})
     assert la._roteiro_base(p) == "SEM livro corrigido"
+
+
+def test_v494_direcao_e_capa_do_livro():
+    import cenas_lote
+    import dp_direcao
+    d = next(x for x in dp_direcao.sistema() if x["id"] == "sys_raciocinio_maldito")
+    assert d["som_transicoes"] == "nenhum" and not any("sfx" in e for e in d["destaques"]["estilos"])
+    import dossies as ds
+    assert ds.MODELOS["raciocinio_maldito"]["direcao_sugerida"] == "sys_raciocinio_maldito"
+    cenas = [{"start": 0, "end": 4, "fala": "o vídeo começa aqui"},
+             {"start": 4, "end": 8, "fala": "pra quem quiser ir mais fundo tem Como Ler um Livro do Adler"}]
+    assert cenas_lote.cena_do_texto(cenas, "Como Ler um Livro") == 1
+    js = cenas_lote.montar_json(cenas, {}, {0}, "", {1: {"id": "I7", "tipo": "foto", "provider": "material", "livro": True}})
+    seg = js["segments"][1]
+    assert seg["query"] == "I7" and seg["aspect_fill"] == "cartao"
+
+
+def test_v495_capa_do_livro_no_fluxo_local(monkeypatch):
+    import app as A
+    p = {"resultado": {"livros": {"ativo": True, "escolhidos": [{"titulo_curto": "Como Ler um Livro", "capa": "I7"}]}}}
+    monkeypatch.setattr(A, "_projeto_do_job", lambda job: ("dossie", None, p, "material"))
+    job = {"segments": [{"start": 0, "end": 5, "text": "abertura do vídeo"},
+                        {"start": 30, "end": 36, "text": "pra quem quiser treinar tem Como Ler um Livro do Adler"}]}
+    segs = [{"start": 0, "end": 10, "provider": "anime_pexels", "query": "x"},
+            {"start": 28, "end": 34, "provider": "anime_pexels", "query": "y"}]
+    assert A._forcar_capas_livro(job, segs) == 1
+    assert segs[1]["provider"] == "material" and segs[1]["query"] == "I7" and segs[1]["aspect_fill"] == "cartao"
+    assert segs[0]["provider"] == "anime_pexels"

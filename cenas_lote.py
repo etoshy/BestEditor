@@ -285,7 +285,9 @@ def montar_json(cenas: List[Dict[str, Any]], info: Dict[int, Dict[str, Any]], es
         if materiais and i in materiais:
             m = materiais[i]
             segs.append({"start": c["start"], "end": c["end"], "provider": m.get("provider") or "material", "query": m["id"],
-                         "visual": visual, "media_type": "video"})  # o site troca pelo arquivo (foto ou vídeo) ao ler o JSON
+                         "visual": visual, "media_type": "video",  # o site troca pelo arquivo (foto ou vídeo) ao ler o JSON
+                         # 📖 v84_494: capa do livro = edição padrão de "propaganda": cartão sobre fundo, sem cortar a capa
+                         **({"aspect_fill": "cartao", "livro": True} if m.get("livro") else {})})
         elif i in escolhidas:
             prompt = d.get("prompt_imagem") or (
                 f"{c['fala']}. Photorealistic documentary photograph, natural light, sharp focus, clean frame without text")
@@ -342,6 +344,20 @@ def _toks(t: str) -> List[str]:
     import unicodedata
     t = "".join(c for c in unicodedata.normalize("NFD", str(t or "").lower()) if unicodedata.category(c) != "Mn")
     return re.findall(r"[^\W_]+", t)
+
+
+def cena_do_texto(cenas: List[Dict[str, Any]], texto: str) -> Optional[int]:
+    """📖 v84_494: a cena cuja fala cita o texto (ex.: o título do livro) — a que tem mais palavras dele (mín. metade)."""
+    alvo = [w for w in _toks(texto) if len(w) > 2][:8]
+    if not alvo:
+        return None
+    melhor, nota = None, 0.0
+    for i, c in enumerate(cenas):
+        fala = set(_toks(c.get("fala")))
+        n = sum(1 for w in alvo if w in fala) / len(alvo)
+        if n > nota:
+            melhor, nota = i, n
+    return melhor if nota >= 0.5 else None
 
 
 def cenas_dos_momentos(cenas: List[Dict[str, Any]], momentos: List[Dict[str, Any]]) -> Dict[int, str]:
