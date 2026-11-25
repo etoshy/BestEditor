@@ -586,6 +586,21 @@ def fundir_em_um(temas: List[Dict[str, Any]], a: Dict[str, Any]) -> Dict[str, An
     fixo = minutos_alvo(a)
     base["minutos"] = fixo or int(min(MINUTOS_MAX, sum(float(t.get("minutos") or 0) for t in temas) or base.get("minutos") or 15))
     base["por_que_tempo"] = f"um vídeo só juntando {len(temas)} eixos do material"
+    try:  # 🧭 v84_479: o título/tema/abertura cobrem o vídeo INTEIRO (o do tema mais forte só prometia um pedaço)
+        import ia_servico as ia
+        from ia_midia import _S, _obj
+        d = ia.chamar("roteiros", "Vários temas viraram UM vídeo só. Escreva o título (até 50 caracteres, linguagem do povo, "
+                      "chamativo) e a ideia central que cobrem TODOS os pontos — o fio que liga tudo, não só o primeiro — e "
+                      "uma abertura fria nova. Só o JSON.",
+                      json.dumps({"pontos": base["pontos"], "temas": [t.get("titulo") for t in temas]}, ensure_ascii=False),
+                      schema=_obj({"titulo": _S, "tema": _S, "abertura": _S}), max_tokens=1500, effort="low", timeout=180)
+        if isinstance(d, dict) and str(d.get("titulo") or "").strip():
+            base["titulo"] = " ".join(str(d["titulo"]).split())[:120]
+            for k, lim in (("tema", 400), ("abertura", 500)):
+                if str(d.get(k) or "").strip():
+                    base[k] = str(d[k]).strip()[:lim]
+    except Exception:  # noqa: BLE001 — sem isso fica o título do tema mais forte
+        pass
     return base
 
 

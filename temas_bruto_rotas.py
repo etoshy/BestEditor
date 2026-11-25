@@ -62,6 +62,12 @@ def registrar(app, base_dir: str, transcricoes_dir: str = "", jobs_transcricao=N
                     cfg["formato"] = t["formato"] if t["formato"] in TB._formatos(a["modelo"]) else cfg.get("formato")
                     cfg["minutos"] = float(t.get("minutos") or cfg.get("minutos") or 10)
                     cfg["titulo"] = t["titulo"]
+                    if t.get("pontos") and not str(cfg.get("extra") or "").strip():
+                        # 🧭 v84_479: o roteiro recebe o MAPA do tema — antes só ia o título, e a IA cobria só o que o
+                        # título prometia (ex.: 3 aulas juntas → só a pergunta capciosa; a condicional e a disjunção sumiam)
+                        cfg["extra"] = ("O vídeo cobre TODOS estes pontos, nesta ordem, cada um com espaço próprio e explicado "
+                                        "UMA vez (é o mapa do material — nenhum fica de fora): "
+                                        + " | ".join(f"{k}) {x}" for k, x in enumerate(t["pontos"], 1)))[:1500]
                     cfg["idioma"] = "pt"
                     if a.get("historias"):  # 🧠 v84_474: o roteiro também recebe as histórias proibidas da aula
                         cfg["historias_proibidas"] = a["historias"]

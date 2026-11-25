@@ -245,7 +245,17 @@ def prompt_parte(contexto: Dict[str, Any], partes: List[Dict[str, Any]], k: int,
     antes = [x for x in partes if x["k"] < k and (x.get("texto") or x.get("fatos"))]
     if antes:
         L += ["", "## JÁ CONTADO nas partes anteriores — NÃO reconte (no máximo meia frase de referência, e só se trouxer algo NOVO)"]
-        L += [f"- {x['k']}. {x['titulo']}: {_resumo_parte(x)}" for x in antes]
+        total_ant = sum(len(str(x.get("texto") or "").split()) for x in antes)
+        if all(x.get("texto") for x in antes) and total_ant <= 6000:
+            # 🔁 v84_479: o TEXTO inteiro das partes anteriores (o resumo de 14 palavras por parágrafo não mostrava os
+            # exemplos já usados — a parte seguinte reexplicava a mesma ideia com o mesmo tipo de exemplo)
+            L.append("Abaixo, o texto já escrito. Toda IDEIA explicada e todo EXEMPLO/SITUAÇÃO usado aqui está GASTO: não "
+                     "explique de novo, não use a mesma situação nem uma variação dela.")
+            for x in antes:
+                limpo = re.sub(r"\[\[?[^\]]*\]\]?", " ", str(x["texto"])).strip()
+                L.append(f"### {x['k']}. {x['titulo']}\n" + limpo)
+        else:
+            L += [f"- {x['k']}. {x['titulo']}: {_resumo_parte(x)}" for x in antes]
     depois = [x for x in partes if x["k"] > k and x.get("fatos")]
     if depois:
         L += ["", "## Vem DEPOIS (não antecipe nem resuma isto aqui)"]

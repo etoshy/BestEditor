@@ -112,3 +112,14 @@ def test_v478_sem_repeticao():
     assert "CONTEÚDO NOVO" in mr.bloco_tamanho(15, 2250)
     assert "PROIBIDO reexplicar" in mr.prompt_completar("x " * 100, 100, 2250, 15)
     assert "IDEIAS DISTINTAS" in tb.system_analise({"modelo": "raciocinio_maldito", "divisao": ""}, "x")
+
+
+def test_v479_partes_veem_texto_anterior_e_mapa():
+    import inspect
+    import roteiro_partes as rp
+    import temas_bruto_rotas
+    partes = [{"k": 1, "titulo": "A", "palavras": 300, "texto": "Exemplo do relatório atrasado [I3]."},
+              {"k": 2, "titulo": "B", "palavras": 300}]
+    pr = rp.prompt_parte({"tema": "x", "minutos": 10}, partes, 2)
+    assert "Exemplo do relatório atrasado" in pr and "GASTO" in pr
+    assert "nenhum fica de fora" in inspect.getsource(temas_bruto_rotas)
