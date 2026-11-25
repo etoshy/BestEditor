@@ -7,12 +7,13 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Dict, List, Optional
 
 import temas_bruto as TB
+import transcricoes_fonte as TF
 
 PARALELO = 3          # roteiros gerados ao mesmo tempo
 _RODANDO: Dict[str, bool] = {}
 
 
-def registrar(app, base_dir: str) -> None:
+def registrar(app, base_dir: str, transcricoes_dir: str = "", jobs_transcricao=None, marcar_feito=None) -> None:
     from flask import jsonify, redirect, render_template, request, url_for
     import dossies as ds
     import dossies_rotas
@@ -203,7 +204,8 @@ def registrar(app, base_dir: str) -> None:
         padrao = next((k for k in mods if k == "marca_cenariom"), next((k for k, m in mods.items() if m.get("do_pacote")), ""))
         return render_template("temas_bruto.html", a=None, lista=TB.listar(base_dir), modelos=mods, padrao=padrao,
                                divisoes=TB.DIVISOES, divisao=TB.DIVISAO_PADRAO,
-                               erro=request.args.get("erro") or "")
+                               erro=request.args.get("erro") or "", ok=request.args.get("ok") or "",
+                               pre_transcricoes=[k for k in (request.args.get("transcricoes") or "").split(",") if k][:60])
 
     @app.route("/temas-bruto/novo", methods=["POST"])
     def temas_bruto_novo():
@@ -212,19 +214,55 @@ def registrar(app, base_dir: str) -> None:
         colado = (request.form.get("texto") or "").strip()
         if colado:
             arquivos.append((colado.encode("utf-8"), "texto_colado.txt"))
-        if not arquivos:
-            return redirect(url_for("temas_bruto_lista", erro="Envie o arquivo ou cole o texto."))
-        conteudo, nome_arq = arquivos[0]
-        try:
-            a = TB.criar(base_dir, request.form.get("nome") or "", request.form.get("modelo") or "", conteudo, nome_arq,
-                         request.form.get("divisao") or "", extras=arquivos[1:],
-                         minutos_alvo_=request.form.get("minutos_alvo") or None)
-        except TB.TemasErro as exc:
-            return redirect(url_for("temas_bruto_lista", erro=str(exc)))
+        # 📝 v84_477: as transcrições do site (📝 Transcrever / lotes do YouTube) escolhidas na lista
+        chaves = [k for k in request.form.getlist("transcricao") if k][:60]
+        de_transc = TF.ler(transcricoes_dir, chaves, jobs_transcricao) if chaves and transcricoes_dir else []
+        if not arquivos and not de_transc:
+            return redirect(url_for("temas_bruto_lista", erro="Envie o arquivo, cole o texto ou escolha uma transcrição."))
+        separadas = request.form.get("separadas") == "1" and len(de_transc) > 1 and not arquivos
+        grupos = [[x] for x in de_transc] if separadas else [arquivos + de_transc]
+        criadas, erros = [], []  # type: ignore[var-annotated]
         import ia_servico as ia
-        if not ia.motivo_desligado("roteiros"):
-            _iniciar_analise(a["id"])
-        return redirect(f"/temas-bruto/{a['id']}")
+        for k, grupo in enumerate(grupos):
+            conteudo, nome_arq = grupo[0]
+            nome = request.form.get("nome") or ""
+            if separadas:
+                nome = (nome + " — " if nome else "") + nome_arq[:-4]
+            try:
+                a = TB.criar(base_dir, nome, request.form.get("modelo") or "", conteudo, nome_arq,
+                             request.form.get("divisao") or "", extras=grupo[1:],
+                             minutos_alvo_=request.form.get("minutos_alvo") or None)
+            except TB.TemasErro as exc:
+                erros.append(f"{nome_arq[:-4]}: {exc}")
+                continue
+            usadas = [chaves[k]] if separadas else chaves
+            if usadas:
+                TB.mexer(base_dir, a["id"], lambda x, u=usadas: x.update(de_transcricoes=u))
+            criadas.append(a["id"])
+            if not ia.motivo_desligado("roteiros"):
+                _iniciar_analise(a["id"])
+        if not criadas:
+            return redirect(url_for("temas_bruto_lista", erro=" · ".join(erros)[:500]))
+        TF.marcar_feitas(chaves, marcar_feito)
+        if len(criadas) > 1 or erros:
+            return redirect(url_for("temas_bruto_lista", ok=f"📚 {len(criadas)} texto(s) criado(s) — a IA está separando os "
+                                    f"temas de cada um" + (f" · ⚠ {' · '.join(erros)}"[:400] if erros else "")))
+        return redirect(f"/temas-bruto/{criadas[0]}")
+
+    @app.route("/temas-bruto/transcricoes")
+    def temas_bruto_transcricoes():
+        """📝 v84_477: as transcrições prontas do site, pra escolher no 📚 Novo texto bruto."""
+        usadas: Dict[str, List[Dict[str, str]]] = {}
+        for x in TB.listar(base_dir):
+            try:
+                for k in TB.carregar(base_dir, x["id"]).get("de_transcricoes") or []:
+                    usadas.setdefault(k, []).append({"id": x["id"], "nome": x["nome"]})
+            except TB.TemasErro:
+                continue
+        lista = TF.listar(transcricoes_dir, jobs_transcricao) if transcricoes_dir else []
+        for t in lista:
+            t["usada_em"] = usadas.get(t["chave"], [])
+        return jsonify({"ok": True, "transcricoes": lista})
 
     def _iniciar_analise(aid: str) -> str:
         import tarefas_bg

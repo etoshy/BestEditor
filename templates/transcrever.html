@@ -279,9 +279,14 @@ document.getElementById('ytAbrir').addEventListener('click', async () => {
   <span id="interrSt" style="color:#555"></span></div>{% endif %}
 {% if jobs %}<p style="font-size:.85rem;margin:0 0 6px"><label style="display:inline;font-weight:400"><input type="checkbox" id="hist-esconder" style="width:auto;margin:0"> esconder os marcados como feitos</label>
   <span style="color:#666"> · {{ jobs|selectattr('feito')|list|length }} de {{ jobs|length }} feitos</span></p>{% endif %}
+{% if jobs %}<div id="usarBarra" style="display:none;position:sticky;top:0;z-index:5;margin:0 0 8px;padding:8px 12px;border:1px solid #c4b5fd;background:#f5f3ff;border-radius:8px;font-size:.86rem">
+  📚 <b id="usarN">0</b> transcrição(ões) escolhida(s)
+  <button type="button" id="usarIr" style="width:auto;margin:0 0 0 8px;padding:4px 12px;font-size:.84rem;background:#7c3aed">📚 Gerar vídeos com elas (Texto bruto)</button>
+  <button type="button" id="usarLimpar" style="width:auto;margin:0 0 0 4px;padding:4px 10px;font-size:.8rem;background:#94a3b8">limpar</button></div>{% endif %}
 {% if not jobs %}<p style="color:#666;font-size:.85rem;">Nada ainda — pode começar um e fechar a aba: quando terminar chega um aviso no 🔔 e fica tudo aqui.</p>{% endif %}
 {% for j in jobs %}
 <div class="hist-item{% if j.feito %} feito{% endif %}" id="j-{{ j.id }}" style="border:1px solid #ddd;border-radius:8px;padding:8px 12px;margin-bottom:6px;font-size:.85rem;">
+  {% if j.status == 'pronto' and j.modo == 'transcrever' %}<label style="display:inline;font-weight:400;margin:0 6px 0 0" title="📚 escolher pra gerar vídeos no Texto bruto"><input type="checkbox" class="hist-usar" value="a:{{ j.id }}" style="width:auto;margin:0"> 📚</label>{% endif %}
   <label style="display:inline;font-weight:400;margin:0 6px 0 0" title="✔ marque o que você já usou (fica salvo)"><input type="checkbox" class="hist-feito" data-id="{{ j.id }}" style="width:auto;margin:0" {% if j.feito %}checked{% endif %}> feito</label>
   <span class="hist-data" data-t="{{ (j.criado_em or 0) | int }}"></span> ·
   {{ 'Transcrever' if j.modo == 'transcrever' else 'Só baixar' }} — {% if j.resultado and j.resultado.titulo %}<b>{{ j.resultado.titulo[:80] }}</b> <span style="color:#94a3b8">{{ (j.url or '')[:50] }}</span>{% else %}{{ (j.url or j.nome or 'arquivo enviado')[:80] }}{% endif %} — <b>{{ 'na fila' if j.status == 'na_fila' else j.status }}</b>
@@ -315,6 +320,16 @@ async function todosInterr(acao) {
 }
 if (document.getElementById('interrMb')) fetch('/transcrever/interrompidos').then(r => r.json()).then(d => {
   document.getElementById('interrMb').textContent = d.mb >= 1000 ? (d.mb / 1000).toFixed(1) + ' GB' : d.mb + ' MB'; }).catch(() => {});
+// 📚 v84_477: escolher 1 ou várias transcrições → Texto bruto (lá escolhe o modelo, quantos vídeos, juntar ou separadas)
+(function () {
+  const cs = () => [...document.querySelectorAll('.hist-usar:checked')];
+  const at = () => { const b = document.getElementById('usarBarra'); if (!b) return; const n = cs().length; b.style.display = n ? '' : 'none'; document.getElementById('usarN').textContent = n; };
+  document.querySelectorAll('.hist-usar').forEach((c) => c.addEventListener('change', at));
+  const ir = document.getElementById('usarIr');
+  if (ir) ir.addEventListener('click', () => { location.href = '/temas-bruto?transcricoes=' + encodeURIComponent(cs().map((c) => c.value).join(',')); });
+  const lp = document.getElementById('usarLimpar');
+  if (lp) lp.addEventListener('click', () => { cs().forEach((c) => { c.checked = false; }); at(); });
+})();
 // ✔ v84_463: marcar o que já foi usado (salvo no servidor) + esconder os feitos (lembrado neste navegador)
 document.querySelectorAll('.hist-feito').forEach(c => c.addEventListener('change', async () => {
   const item = document.getElementById('j-' + c.dataset.id);

@@ -27,6 +27,7 @@
   <b>todos os roteiros ao mesmo tempo</b>, em português e prontos pra narração. Depois é só mandar pra 🏭 Produção no pod.</p>
 <div class="tb-passos"><span>1 · arquivo + modelo</span><span>2 · 🤖 temas</span><span>3 · você marca</span><span>4 · 🚀 roteiros em paralelo</span><span>5 · 🏭 pod</span></div>
 {% if erro %}<div class="error">{{ erro }}</div>{% endif %}
+{% if ok is defined and ok %}<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:8px 12px;margin:8px 0">{{ ok }}</div>{% endif %}
 
 {% if not a %}
 <div class="tb-card">
@@ -42,6 +43,21 @@
     <input type="file" name="arquivo" multiple accept=".txt,.md,.pdf,.epub,.docx,.srt,.vtt,.html,.htm,.rtf">
     <label>…ou cole o texto</label>
     <textarea name="texto" rows="4" placeholder="cole aqui a transcrição ou o texto"></textarea>
+    <!-- 📝 v84_477: as transcrições do site -->
+    <label>…ou escolha das suas <a href="/transcrever#historico" target="_blank">📝 transcrições</a>
+      <span style="font-weight:400;color:#888;">(marque 1 ou várias)</span></label>
+    <div id="trBox" style="border:1px solid #e5e7eb;border-radius:8px;padding:6px 10px">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:.85rem">
+        <input type="search" id="trBusca" placeholder="🔎 procurar pelo título" style="flex:1;min-width:160px;margin:0">
+        <label style="display:inline;font-weight:400;margin:0"><input type="checkbox" id="trEsconder" style="width:auto;margin:0" checked> esconder as já usadas</label>
+        <span id="trConta" style="color:#555"></span>
+      </div>
+      <div id="trLista" style="max-height:260px;overflow:auto;margin-top:6px;font-size:.85rem"><span style="color:#888">carregando…</span></div>
+      <div id="trModo" style="display:none;margin-top:6px;font-size:.85rem;background:#f8fafc;border-radius:6px;padding:6px 8px">
+        <label style="display:block;font-weight:400;margin:0"><input type="radio" name="separadas" value="0" checked style="width:auto;margin:0"> 🧩 <b>juntar todas</b> num material só (mesmo assunto — os vídeos usam o que cada uma tem de melhor)</label>
+        <label style="display:block;font-weight:400;margin:4px 0 0"><input type="radio" name="separadas" value="1" style="width:auto;margin:0"> 📚 <b>cada uma separada</b> (um texto bruto pra cada, cada um com os vídeos dele)</label>
+      </div>
+    </div>
     <label>Nome <span style="font-weight:400;color:#888;">(opcional — pra achar depois)</span></label>
     <input type="text" name="nome" placeholder="ex.: Curso de filosofia — aula 1">
     <button type="submit" id="btnNovo">📚 Enviar e separar os temas</button>
@@ -56,7 +72,40 @@
   </div>
   {% else %}<p style="color:#888;">Nenhum ainda.</p>{% endfor %}
 </div>
-<script>document.getElementById('formNovo').addEventListener('submit', () => { const b = document.getElementById('btnNovo'); b.disabled = true; b.textContent = '⏳ enviando…'; });
+<script>
+(function () {  // 📝 v84_477: escolher as transcrições do site
+  const SEL = new Set({{ (pre_transcricoes if pre_transcricoes is defined else [])|tojson }});
+  const esc = (t) => String(t == null ? '' : t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const $ = (id) => document.getElementById(id);
+  let L = [];
+  try { $('trEsconder').checked = localStorage.getItem('tb_tr_esconder') !== '0'; } catch (e) {}
+  const marcadas = () => [...SEL];
+  window.__trSel = SEL;
+  function desenhar() {
+    const q = $('trBusca').value.trim().toLowerCase(), sel = SEL, esconder = $('trEsconder').checked;
+    const vis = L.filter((t) => (!q || t.titulo.toLowerCase().includes(q)) && (!esconder || sel.has(t.chave) || !(t.usada_em.length || t.feito)));
+    $('trLista').innerHTML = vis.length ? vis.map((t) => `<label style="display:flex;gap:6px;align-items:flex-start;font-weight:400;margin:0;padding:3px 0;border-bottom:1px solid #f1f5f9">
+      <input type="checkbox" name="transcricao" value="${esc(t.chave)}" ${sel.has(t.chave) ? 'checked' : ''} style="width:auto;margin:2px 0 0">
+      <span><b>${esc(t.titulo)}</b> <span style="color:#888">· ${esc(t.origem)} · ${t.palavras.toLocaleString('pt-BR')} palavras · ${new Date(t.quando * 1000).toLocaleDateString('pt-BR')}</span>
+      ${t.usada_em.length ? ' <span style="color:#15803d">· já usada em ' + t.usada_em.map((u) => `<a href="/temas-bruto/${esc(u.id)}" target="_blank">${esc(u.nome)}</a>`).join(', ') + '</span>' : t.feito ? ' <span style="color:#15803d">· ✔ feita</span>' : ''}</span></label>`).join('')
+      : `<span style="color:#888">${L.length ? 'nenhuma com esse filtro' : 'nenhuma transcrição pronta ainda — faça em 📝 Transcrever'}</span>`;
+    conta();
+  }
+  function conta() {
+    const n = marcadas().length, pal = L.filter((t) => marcadas().includes(t.chave)).reduce((s, t) => s + t.palavras, 0);
+    $('trConta').textContent = n ? `${n} marcada(s) · ${pal.toLocaleString('pt-BR')} palavras` : `${L.length} transcrição(ões)`;
+    $('trModo').style.display = n > 1 ? '' : 'none';
+  }
+  $('trLista').addEventListener('change', (e) => { if (e.target.name === 'transcricao') { e.target.checked ? SEL.add(e.target.value) : SEL.delete(e.target.value); } conta(); });
+  $('trBusca').addEventListener('input', desenhar);
+  $('trEsconder').addEventListener('change', () => { try { localStorage.setItem('tb_tr_esconder', $('trEsconder').checked ? '1' : '0'); } catch (e) {} desenhar(); });
+  fetch('/temas-bruto/transcricoes').then((r) => r.json()).then((d) => { L = d.transcricoes || []; desenhar(); })
+    .catch(() => { $('trLista').innerHTML = '<span style="color:#b91c1c">não consegui listar as transcrições</span>'; });
+})();
+</script>
+<script>document.getElementById('formNovo').addEventListener('submit', () => {
+  const f = document.getElementById('formNovo'), vis = new Set([...f.querySelectorAll('input[name=transcricao]')].map((c) => c.value));
+  (window.__trSel || []).forEach((k) => { if (!vis.has(k)) { const h = document.createElement('input'); h.type = 'hidden'; h.name = 'transcricao'; h.value = k; f.appendChild(h); } }); const b = document.getElementById('btnNovo'); b.disabled = true; b.textContent = '⏳ enviando…'; });
 (function () {  // ⏱/🎯 v84_468: o tempo de cada vídeo
   const dv = document.getElementById('divisao'), box = document.getElementById('minBox'), dica = document.getElementById('minDica'), mi = document.getElementById('minutosAlvo');
   const sync = () => { box.style.display = (dv.value === 'tempo' || dv.value === 'um') ? '' : 'none';

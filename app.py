@@ -11965,7 +11965,14 @@ _elenco.registrar(app, BASE_DIR)
 import piloto as _piloto  # noqa: E402  (🚀 v84_157: piloto automático do Modelo de vídeo)
 _piloto.registrar(app, BASE_DIR)
 import temas_bruto_rotas as _temas_bruto  # noqa: E402  (📚 v84_368: texto bruto → vários vídeos)
-_temas_bruto.registrar(app, BASE_DIR)
+def _transcricao_feita(jid: str) -> None:  # 📝 v84_477: virou texto bruto = ✔ feito no 📝 Transcrever
+    j = _TRANSCRICOES_AVULSAS_JOBS.get(jid)
+    if j and not j.get("feito"):
+        j["feito"] = True
+        _historico_salvar(TRANSCRICOES_AVULSAS_DIR, j)
+
+
+_temas_bruto.registrar(app, BASE_DIR, TRANSCRICOES_AVULSAS_DIR, _TRANSCRICOES_AVULSAS_JOBS, _transcricao_feita)
 import formatos_rotas as _formatos  # noqa: E402  (📐 v84_421: Formatos de vídeo — a fórmula do canal aprendida dos roteiros)
 _formatos.registrar(app, BASE_DIR)
 import fontes_confianca_rotas as _fontes_conf  # noqa: E402  (🛡 v84_437: Fontes confiáveis — sites testados, avaliados e aprendidos)
