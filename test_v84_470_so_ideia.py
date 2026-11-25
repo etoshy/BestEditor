@@ -140,3 +140,11 @@ def test_v481_revisao_pega_repeticao_entre_partes():
     pr = rr.prompt("Texto " * 300, tema="x", modo="melhorar", titulo="Por que x")
     assert "A MESMA EXPLICAÇÃO EM DOIS LUGARES" in pr and "EXEMPLO QUE NÃO FUNCIONA" in pr
     assert "narrador" not in mr.tirar_bastidor("Fim. Eu sou o narrador, e este é o Raciocínio Maldito.")
+
+
+def test_v482_explicativo_poucos_capitulos_grandes():
+    import revisao_roteiro as rr
+    import roteiro_partes as rp
+    assert rp.n_capitulos(20) == 10 and rp.n_capitulos(20, True) == 5
+    assert "MESMO capítulo" in rp.bloco_plano(20, 3000, enxuto=True)
+    assert "REFERÊNCIA ÓRFÃ" in rr.prompt("Texto " * 300, tema="x", modo="melhorar", titulo="Por que x")

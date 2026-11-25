@@ -51,13 +51,15 @@ def usa_partes(cfg: Dict[str, Any], minutos: float) -> bool:
     return modo == "sim" or minutos >= PARTES_A_PARTIR_DE
 
 
-def n_capitulos(minutos: float) -> int:
+def n_capitulos(minutos: float, enxuto: bool = False) -> int:
+    if enxuto:  # 🧱 v84_482: explicativo = poucos capítulos GRANDES (10 de 300 palavras reexplicavam a mesma ideia cada um)
+        return max(3, min(7, int(round(minutos / 4.0))))
     return max(4, min(14, int(round(minutos / 2.0))))
 
 
 # ------------------------------------------------------------------ 1º prompt (o plano)
 def bloco_plano(minutos: float, palavras: int, estrutura: Optional[List[str]] = None, enxuto: bool = False) -> str:
-    n = n_capitulos(minutos)
+    n = n_capitulos(minutos, enxuto)
     por = max(MIN_PALAVRAS_PARTE, palavras // n)
     fatos = ("  • \"fatos\": 3 a 7 pontos — SÓ os que a pessoa precisa pra entender o título (o 🎯 escopo); cada um com a fonte "
              "(F1, F2…) e o tipo (fato documentado / modelo científico / hipótese). Explicativo: menos coisas, bem explicadas — "
@@ -68,10 +70,13 @@ def bloco_plano(minutos: float, palavras: int, estrutura: Optional[List[str]] = 
     return (f"## ✍️ ESTE ROTEIRO É ESCRITO EM PARTES (vídeo de ~{minutos:g} min ≈ {palavras} palavras)\n"
             "AGORA você NÃO escreve o roteiro. Você faz o PLANO DETALHADO — depois eu peço cada capítulo separado, um por vez, "
             "e você escreve aquele capítulo inteiro com o tamanho dele.\n"
-            f"- Em \"capitulos\", divida o vídeo em ~{n} capítulos (entre {max(4, n - 2)} e {n + 2}) seguindo a estrutura do "
+            f"- Em \"capitulos\", divida o vídeo em ~{n} capítulos (entre {max(3 if enxuto else 4, n - 1 if enxuto else n - 2)} e "
+            f"{n + 1 if enxuto else n + 2}) seguindo a estrutura do "
             "formato e o método de roteiro (gancho no 1º, viradas, final). Cada capítulo:\n"
             "  • \"titulo\": curto e chamativo (vira o capítulo da descrição do YouTube);\n"
             "  • \"objetivo\": o que este capítulo conta, que pergunta abre/fecha e como termina (o gancho pro próximo);\n"
+            + ("  • cada IDEIA/conceito do material pertence a UM capítulo só — dois capítulos nunca explicam a mesma coisa "
+               "(ex.: \"o que é a réplica\" e \"réplica não é fuga\" são o MESMO capítulo);\n" if enxuto else "")
             + fatos +
             "  • \"midias\": TODOS os IDs das imagens/vídeos que combinam com ele (ex.: [\"I3\", \"I7\", \"I9\"]) — a mesma "
             "imagem pode (e deve) estar em vários capítulos quando a pessoa/lugar volta na história;\n"

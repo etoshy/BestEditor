@@ -109,7 +109,12 @@ def prompt(roteiro: str, idioma: str = "o idioma do roteiro", tema: str = "", fo
               "SÓ a melhor vez; nas outras, apague o trecho (\"para\": \"\") ou troque por UMA frase-ponte curta. É o erro "
               "mais comum de roteiro escrito em partes — procure ativamente.",
               "H. EXEMPLO QUE NÃO FUNCIONA (cena absurda, frase que se contradiz, exemplo que mostra outra coisa): troque por "
-              "um que mostre exatamente a ideia, ou apague.",
+              "um que mostre exatamente a ideia, ou apague. Confira também se uma explicação CONTRADIZ outra do roteiro "
+              "(ex.: um trecho diz que algo desmente a regra e outro diz que não) — fica a certa.",
+              "H2. REFERÊNCIA ÓRFÃ: \"o colega do prazo\", \"como no caso de…\" citando um exemplo que NÃO aparece antes no "
+              "roteiro → troque pelo exemplo certo que já apareceu, ou conte a cena ali mesmo.",
+              "H3. FÓRMULA REPETIDA: a mesma frase-modelo (a mesma fala de exemplo, a mesma expressão-tese) dita 3+ vezes → "
+              "deixe 1 ou 2, as outras ditas de outro jeito ou cortadas.",
               "I. FECHAMENTO com conceito que não foi explicado antes, ou duas conclusões seguidas: deixe UMA, só amarrando.", ""]
     if esc:
         L += [f"## 🎯 MODO ESCOPO — o vídeo cobre SÓ o necessário pra entender o título “{titulo}”",
