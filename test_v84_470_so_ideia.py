@@ -145,6 +145,16 @@ def test_v481_revisao_pega_repeticao_entre_partes():
 def test_v482_explicativo_poucos_capitulos_grandes():
     import revisao_roteiro as rr
     import roteiro_partes as rp
-    assert rp.n_capitulos(20) == 10 and rp.n_capitulos(20, True) == 5
+    assert rp.n_capitulos(20) == 10 and rp.n_capitulos(20, True) == 10
     assert "MESMO capítulo" in rp.bloco_plano(20, 3000, enxuto=True)
     assert "REFERÊNCIA ÓRFÃ" in rr.prompt("Texto " * 300, tema="x", modo="melhorar", titulo="Por que x")
+
+
+def test_v483_revisao_nao_encolhe_e_tts_cortado():
+    import adaptar_tts as at
+    import pytest
+    import revisao_roteiro as rr
+    pr = rr.prompt("Texto " * 1200, tema="x", modo="melhorar", titulo="Por que x", alvo_palavras=1300)
+    assert "nunca só apague" in pr
+    with pytest.raises(ValueError):
+        at.ler_resposta("palavra " * 100, "palavra " * 1000)

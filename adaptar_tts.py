@@ -344,6 +344,9 @@ def ler_resposta(resposta: str, original: str, vozes: Optional[List[str]] = None
     if faltam_c:
         avisos.append("Marcas de cena que sumiram: " + ", ".join(f"[CENA {c}]" for c in faltam_c) + ".")
     pa, pb = palavras(original), palavras(t)
+    if pa > 300 and pb < pa * 0.6:  # 📏 v84_483: encolheu demais = a resposta da IA veio CORTADA — não troca o roteiro
+        raise ValueError(f"A adaptação veio cortada: {pa} → {pb} palavras ({100 * pb // pa}%). O roteiro NÃO foi trocado — "
+                         "peça de novo (ou adapte em pedaços).")
     if pa and pb < pa * 0.85:
         avisos.append(f"O texto encolheu: {pa} → {pb} palavras ({100 * pb // pa}%). A adaptação não devia encurtar — confira se "
                       "nada importante sumiu.")

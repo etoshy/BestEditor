@@ -115,6 +115,7 @@ def registrar(app, base_dir: str, transcricoes_dir: str = "", jobs_transcricao=N
                 _estado(aid, tid, "revisao", "🪄 revisão + 🎙 adaptando pro TTS…")
                 try:
                     _esperar_tarefa(_post(f"/roteiro-auto/dossie/{pid}", {"pagina": f"/modelos-video/{pid}"})["tarefa"])
+                    _completar_tamanho(aid, tid, pid, t)  # 📏 v84_483: a revisão cortou repetição e encolheu demais? completa
                     pr = _post(f"/tts-adaptar/dossie/{pid}/prompt")["prompt"]
                     resp = _post("/ia/gerar", {"prompt": pr, "titulo": "TTS: " + t["titulo"][:80]})
                     _post(f"/tts-adaptar/dossie/{pid}/ler", {"texto": resp.get("texto") or ""})

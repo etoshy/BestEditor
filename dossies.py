@@ -1776,7 +1776,10 @@ def prompt_completar(p: Dict[str, Any]) -> str:
         idiomas.nome_para_prompt(idiomas.normalizar(cfg.get("idioma")) or "pt"),
         regras_extra=((REGRAS_COMPLETAR_PROPRIOS + [REGRA_VARIAR_EXEMPLOS])
                       if (MODELOS.get(cfg.get("modelo")) or {}).get("exemplos_proprios") else [])
-        + [REGRA_MARCAS_DAS_NOTAS] + ([bloco_historias_proibidas(cfg)] if bloco_historias_proibidas(cfg) else []))
+        + [REGRA_MARCAS_DAS_NOTAS] + ([bloco_historias_proibidas(cfg)] if bloco_historias_proibidas(cfg) else [])
+        # 🧭 v84_483: o mapa do tema (pedido extra) — o que faltar dele é o 1º conteúdo novo a entrar
+        + ([f"o PEDIDO do autor vale aqui também; o que dele ainda NÃO está no roteiro é o primeiro conteúdo novo a "
+            f"entrar: {str(cfg['extra']).strip()[:1500]}"] if str(cfg.get("extra") or "").strip() else []))
 
 
 # 🧠 v84_473: no canal de exemplos do zero a fonte só tem as IDEIAS (as histórias da aula saíram) — o tamanho vem de

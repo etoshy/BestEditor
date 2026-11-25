@@ -52,8 +52,8 @@ def usa_partes(cfg: Dict[str, Any], minutos: float) -> bool:
 
 
 def n_capitulos(minutos: float, enxuto: bool = False) -> int:
-    if enxuto:  # 🧱 v84_482: explicativo = poucos capítulos GRANDES (10 de 300 palavras reexplicavam a mesma ideia cada um)
-        return max(3, min(7, int(round(minutos / 4.0))))
+    # ↩ v84_483: a v84_482 fazia poucos capítulos grandes no explicativo — o roteiro saiu com 1/3 do tamanho. Voltou ao de
+    # antes (o roteiro de ~3.000 palavras); a repetição agora é tratada depois, na 🪄 revisão (troca, sem encolher).
     return max(4, min(14, int(round(minutos / 2.0))))
 
 
@@ -70,8 +70,7 @@ def bloco_plano(minutos: float, palavras: int, estrutura: Optional[List[str]] = 
     return (f"## ✍️ ESTE ROTEIRO É ESCRITO EM PARTES (vídeo de ~{minutos:g} min ≈ {palavras} palavras)\n"
             "AGORA você NÃO escreve o roteiro. Você faz o PLANO DETALHADO — depois eu peço cada capítulo separado, um por vez, "
             "e você escreve aquele capítulo inteiro com o tamanho dele.\n"
-            f"- Em \"capitulos\", divida o vídeo em ~{n} capítulos (entre {max(3 if enxuto else 4, n - 1 if enxuto else n - 2)} e "
-            f"{n + 1 if enxuto else n + 2}) seguindo a estrutura do "
+            f"- Em \"capitulos\", divida o vídeo em ~{n} capítulos (entre {max(4, n - 2)} e {n + 2}) seguindo a estrutura do "
             "formato e o método de roteiro (gancho no 1º, viradas, final). Cada capítulo:\n"
             "  • \"titulo\": curto e chamativo (vira o capítulo da descrição do YouTube);\n"
             "  • \"objetivo\": o que este capítulo conta, que pergunta abre/fecha e como termina (o gancho pro próximo);\n"

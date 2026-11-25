@@ -108,6 +108,10 @@ def prompt(roteiro: str, idioma: str = "o idioma do roteiro", tema: str = "", fo
               "no bloco 3; \"uma pergunta não é verdadeira nem falsa\" dita 3 vezes; a mesma regra no meio e no fim): fica "
               "SÓ a melhor vez; nas outras, apague o trecho (\"para\": \"\") ou troque por UMA frase-ponte curta. É o erro "
               "mais comum de roteiro escrito em partes — procure ativamente.",
+              (f"⚠ TAMANHO: o vídeo pedido tem ~{alvo_palavras} palavras e o roteiro tem {n}. Apagar repetição NÃO pode "
+               f"deixar o roteiro abaixo de ~{int(alvo_palavras * 0.9)} palavras: quando apagar um trecho repetido, ponha NO "
+               "LUGAR dele um trecho NOVO do mesmo tamanho (a explicação do porquê, a objeção e a resposta, um exemplo de outra "
+               "área, um ponto do tema que ainda não foi coberto) — nunca só apague." if alvo_palavras and not enx else ""),
               "H. EXEMPLO QUE NÃO FUNCIONA (cena absurda, frase que se contradiz, exemplo que mostra outra coisa): troque por "
               "um que mostre exatamente a ideia, ou apague. Confira também se uma explicação CONTRADIZ outra do roteiro "
               "(ex.: um trecho diz que algo desmente a regra e outro diz que não) — fica a certa.",

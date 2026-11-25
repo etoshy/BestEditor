@@ -1160,6 +1160,11 @@ def registrar(app, base_dir: str) -> None:
                            str(p.get("tema") or p.get("titulo") or ""), foco, alvo_palavras=int(pad.get("alvo") or 0),
                            minutos=float(pad.get("minutos") or 0), modo=m)
             r = rv.aplicar(texto, chamar(pr))
+            _n0, _n1, _alvo = rv.palavras(texto), rv.palavras(r["texto"]), int(pad.get("alvo") or 0)
+            if r["aplicadas"] and m != "enxugar" and _alvo and _n1 < _n0 * 0.85 and _n1 < _alvo * 0.9:
+                # 📏 v84_483: a revisão é pra CONSERTAR (repetição, contradição, exemplo ruim), não pra encolher o vídeo
+                t.progresso(f"⚠ a revisão encolheu demais ({_n0} → {_n1} palavras) — mantive o roteiro de antes")
+                return {"modo": m, "aplicadas": 0, "palavras": _n0, "descartada": f"encolheria de {_n0} pra {_n1} palavras"}
             if r["aplicadas"]:
                 antes = (p.get("resultado") or {}).get("roteiro_antes_revisao") if origem == "dossie" else None
                 _gravar(origem, pid, p, r["texto"], antes or texto, [], chave_antes="roteiro_antes_revisao",
