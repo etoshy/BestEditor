@@ -132,3 +132,11 @@ def test_v480_bastidor_exemplo_chamadas():
     assert "partes anteriores" not in t and "quando falamos da réplica" in t
     assert "EXEMPLO TEM QUE FUNCIONAR" in ds.REGRA_FALA and "O FECHAMENTO SÓ AMARRA" in ds.REGRA_FALA
     assert ds.MODELOS["raciocinio_maldito"]["chamadas"]["venda"] == 1
+
+
+def test_v481_revisao_pega_repeticao_entre_partes():
+    import metodo_roteiro as mr
+    import revisao_roteiro as rr
+    pr = rr.prompt("Texto " * 300, tema="x", modo="melhorar", titulo="Por que x")
+    assert "A MESMA EXPLICAÇÃO EM DOIS LUGARES" in pr and "EXEMPLO QUE NÃO FUNCIONA" in pr
+    assert "narrador" not in mr.tirar_bastidor("Fim. Eu sou o narrador, e este é o Raciocínio Maldito.")

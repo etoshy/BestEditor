@@ -103,7 +103,14 @@ def prompt(roteiro: str, idioma: str = "o idioma do roteiro", tema: str = "", fo
               "D. FECHAMENTO: o último parágrafo volta ao título e RESPONDE a ele somando as provas (sim / não / depende, com os "
               "fatos), e termina com uma pergunta ao público ligada ao título. → troque o último parágrafo.",
               "E. Título exagerado (“o pior”, “o mais…”): trate como pergunta a investigar — sem inventar pra confirmar.",
-              "F. Frase repetida (a mesma frase ou ideia dita de novo logo em seguida): apague a repetição (\"para\": \"\").", ""]
+              "F. Frase repetida (a mesma frase ou ideia dita de novo logo em seguida): apague a repetição (\"para\": \"\").",
+              "G. 🔁 A MESMA EXPLICAÇÃO EM DOIS LUGARES (ex.: as \"três formas de responder\" explicadas no bloco 2 e de novo "
+              "no bloco 3; \"uma pergunta não é verdadeira nem falsa\" dita 3 vezes; a mesma regra no meio e no fim): fica "
+              "SÓ a melhor vez; nas outras, apague o trecho (\"para\": \"\") ou troque por UMA frase-ponte curta. É o erro "
+              "mais comum de roteiro escrito em partes — procure ativamente.",
+              "H. EXEMPLO QUE NÃO FUNCIONA (cena absurda, frase que se contradiz, exemplo que mostra outra coisa): troque por "
+              "um que mostre exatamente a ideia, ou apague.",
+              "I. FECHAMENTO com conceito que não foi explicado antes, ou duas conclusões seguidas: deixe UMA, só amarrando.", ""]
     if esc:
         L += [f"## 🎯 MODO ESCOPO — o vídeo cobre SÓ o necessário pra entender o título “{titulo}”",
               "1. Primeiro decida (pra você): quais 3 a 6 passos a pessoa PRECISA entender pra responder o título. Esse é o vídeo.",
