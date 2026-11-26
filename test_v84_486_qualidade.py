@@ -209,6 +209,6 @@ def test_v501_status_dos_livros(monkeypatch):
     job = {"segments": [{"start": 30, "end": 36, "text": "tem Como Ler um Livro do Adler"}],
            "pending_segments": [{"start": 28, "end": 34, "provider": "material", "query": "I7", "livro": True}]}
     st = A.status_livros(job)
-    assert st[0]["no_roteiro"] and st[0]["falado_em"] == 30 and st[0]["trecho"] == 0
+    assert st[0]["no_roteiro"] and st[0]["falado_em"] == 30 and st[0]["trecho"] == 0 and st[0]["no_texto"] is False
     job["segments"][0]["text"] = "outra coisa"
     assert A.status_livros(job)[0]["falado_em"] is None

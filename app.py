@@ -3847,8 +3847,11 @@ def status_livros(job: dict) -> List[Dict[str, Any]]:
         k = next((i for i, x in enumerate(segs) if isinstance(x, dict) and str(x.get("query") or "").upper() == cid
                   and x.get("provider") in ("material", "produto") or (isinstance(x, dict) and x.get("livro")
                                                                          and str(x.get("query") or "").upper() == cid)), None)
+        rot = str((pj[2].get("resultado") or {}).get("roteiro_final") or (pj[2].get("resultado") or {}).get("roteiro") or "")
+        no_texto = _fala_do_livro({"segments": [{"start": 0, "text": x} for x in re.split(r"\n\s*\n", rot) if x.strip()]},
+                                  livro) is not None
         out.append({"titulo": livro.get("titulo_curto") or livro.get("titulo") or "livro", "capa": cid,
-                    "no_roteiro": bool(lv.get("ativo")), "falado_em": float(f["start"]) if f else None,
+                    "no_roteiro": bool(lv.get("ativo")), "no_texto": no_texto, "falado_em": float(f["start"]) if f else None,
                     "trecho": k, "trecho_inicio": float(segs[k]["start"]) if k is not None else None})
     return out
 
