@@ -269,7 +269,10 @@ def montar_prompt(job: Dict[str, Any], estado: Dict[str, Any]) -> str:
     en = _itens_eixo(p, "entradas") + _itens_eixo(p, "saidas")
     L.append("Entradas/saídas: " + ", ".join(sorted({i for i, _w in en})) if en else "Entradas/saídas: " + ", ".join(e["id"] for e in dp_visual.entradas() if e["id"] != "none"))
     fi = _itens_eixo(p, "filtros")
-    L.append("Filtros: " + ", ".join(i for i, _w in fi) if fi else "Filtros: " + ", ".join(rot_fi))
+    if not (p.get("filtros") or {}).get("pct", 0):  # 🎨 v84_499: direção sem filtro — nem mostra o catálogo
+        L.append("Filtros: NÃO usar nesta direção — mande \"filtro_cor\": \"original\".")
+    else:
+        L.append("Filtros: " + ", ".join(i for i, _w in fi) if fi else "Filtros: " + ", ".join(rot_fi))
     tpl_itens = [i for i, _w in _itens_eixo(p, "templates")]
     if tpl_itens or ((p.get("templates") or {}).get("pct", 0) and sistema):
         bloco = cenas_dp.bloco_para_prompt(400).splitlines()

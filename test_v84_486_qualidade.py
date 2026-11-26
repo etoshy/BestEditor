@@ -174,3 +174,16 @@ def test_v498_livro_em_projeto_antigo(monkeypatch):
     assert s["query"] == "I7" and s["aspect_fill"] == "cartao" and "override_source" not in s and usados == [s]
     assert job["segment_previews"][0] == {} and any(d["origem"] == "livro" for d in job["destaques"])
     assert A._livro_em_projeto_antigo("j", job) == 0  # uma vez só
+
+
+def test_v499_sem_filtro_tempo_de_leitura_e_enumeracao():
+    import dp_destaques as dd
+    import dp_direcao
+    import prompt_edicao as pe
+    segs = [{"start": i * 5, "end": i * 5 + 5, "foto": True} for i in range(30)]
+    assert dp_direcao.planejar(segs, "sys_raciocinio_maldito", semente=7)["filtro_cor"] is None
+    pal = [{"word": "Pressuposto", "start": 10.0, "end": 10.6}, {"word": "é", "start": 10.7, "end": 10.8}]
+    d = dd.ancorar([{"estilo": "branco", "start": 10, "end": 10.6, "texto": "1. PRESSUPOSTO"}], pal, 60)
+    assert d[0]["end"] - d[0]["start"] >= 2.15
+    pr = pe.montar_prompt({"pending_segments": [], "total_duration": 60}, {"direcao": "sys_raciocinio_maldito", "segmentos": []})
+    assert "ENUMERAÇÃO = ÊNFASE" in pr and "Filtro de cor (UM pro vídeo todo): NÃO usar" in pr

@@ -277,8 +277,8 @@ RACIOCINIO_MALDITO: Dict[str, Any] = {
                  "efeito sonoro nenhum — a voz manda.",
     "sistema": True, "v": 3, "intensidade": None, "conjuntos": {}, "ritmo": "calmo", "marca": None, "universo": "predef",
     "cores": {"ativa": True, "modo": "predef", "primaria": "#F4F1EA", "secundaria": "#0E0E12", "acento": "#8E2C3A"},
-    "filtros": {"pct": 75, "itens": [{"id": "documentary", "peso": 3}, {"id": "matte", "peso": 2}, {"id": "noir_soft", "peso": 2},
-                                     {"id": "cinematic", "peso": 1}]},
+    # 🎨 v84_499: SEM filtro de cor (o preto e branco/escurecido no vídeo todo ficava estranho) — a imagem como ela é
+    "filtros": {"pct": 0, "itens": []},
     "efeitos": {"pct": 70, "itens": [
         {"id": "zoom_respiro", "peso": 5}, {"id": "zoom_in", "peso": 2}, {"id": "ken_burns_doc", "peso": 2},
         {"id": "pan_dir", "peso": 1}, {"id": "pan_baixo", "peso": 1},
@@ -295,7 +295,7 @@ RACIOCINIO_MALDITO: Dict[str, Any] = {
     "pares": {"modo": "livre", "itens": []},
     "legenda": None,
     "destaques": {"ativo": True, "densidade": "minimal", "estilos": [
-        "branco", "capitulo", "estat", "doc_lower", "gancho_frio", "dossie_maquina_escrever"]},
+        "branco", "capitulo", "estat", "doc_lower", "gancho_frio", "dossie_maquina_escrever", "ed_contagem", "ed_selo_capitulo"]},
     "editoriais": {"ativo": True, "densidade": "minimal", "tipos": ["reescrita", "numero", "nome", "titulo_video", "pagina"]},
     "som_transicoes": "nenhum",
     "sem_efeito_sonoro": True,
@@ -303,8 +303,14 @@ RACIOCINIO_MALDITO: Dict[str, Any] = {
              "zoom rápido, contagem, emoji, setinha, \"whoosh\" ou texto pipocando.\n"
              "2) Cada plano fica 5–7 s com a câmera respirando devagar (zoom_respiro / ken_burns_doc); corte seco na maioria "
              "das emendas; fade pro preto só nas VIRADAS de assunto (início de capítulo, a grande pergunta, o fechamento).\n"
-             "3) Imagem escura e limpa: um filtro sóbrio pro vídeo todo (documentary/matte/noir_soft), vinheta leve; nada de "
-             "cor estourada.\n"
+             "3) SEM filtro de cor (filtro_cor = \"original\"): nada de preto e branco, sépia ou escurecer o vídeo todo; "
+             "nada de efeito aleatório — CADA efeito, texto ou quadro existe porque a fala pede (se não sabe dizer por que "
+             "um efeito está ali, tire).\n"
+             "3b) ENUMERAÇÃO = ÊNFASE: quando a fala anuncia uma lista (\"4 princípios\", \"3 passos\", \"duas regras\"), "
+             "marque o anúncio (ed_contagem ou capitulo) e DEPOIS cada item no momento em que é dito (\"1. NOME DO ITEM\", "
+             "\"2. …\"), cada um ficando na tela enquanto o item é explicado (não 1 segundo).\n"
+             "3c) TEMPO DE LEITURA: todo texto fica na tela no mínimo ~2,5 s e o tempo de ser lido com calma (+0,35 s por "
+             "palavra); definição e citação ficam enquanto a fala explica.\n"
              "4) Texto na tela RARO e com função: o NOME do conceito quando ele é definido (ex.: \"PRESSUPOSTO\"), a pergunta "
              "central do vídeo, um número que a fala diz. Fonte serifada/limpa, branco com acento vinho (#8E2C3A). No máximo 1 "
              "destaque a cada ~40–60 s.\n"

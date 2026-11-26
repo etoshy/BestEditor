@@ -95,6 +95,12 @@ def _norm(p: str) -> str:
     return re.sub(r"[^\wà-ÿ]", "", (p or "").lower())
 
 
+def tempo_de_leitura(texto: str) -> float:
+    """Segundos pra ler o texto na tela com calma: ~2,2 s no mínimo, +0,35 s por palavra (teto de 7 s)."""
+    n = len(re.sub(r"\[[^\]]*\]", " ", str(texto or "")).split())
+    return min(7.0, max(2.2, 1.2 + 0.35 * n)) if n else 0.0
+
+
 def ancorar(destaques: List[Dict[str, Any]], palavras: List[Dict[str, Any]], duracao: Optional[float] = None) -> List[Dict[str, Any]]:
     """Recalcula início/fim de cada destaque pela fala (pre-roll antes da 1ª
     palavra do texto dele, tail na pausa seguinte) e tira sobreposições."""
@@ -122,6 +128,8 @@ def ancorar(destaques: List[Dict[str, Any]], palavras: List[Dict[str, Any]], dur
             pos = min(1.0, 0.45 * (prox - fala_fim)) if prox is not None else min(1.0, cl.get("postRollMaxS", 0.26) * 2)
             ini, fim = max(0.0, fala_ini - pre), fala_fim + max(cl.get("postRollMaxS", 0.2), pos)
         fim = max(fim, ini + max(0.6, cl.get("minTotalS", 1.0)))
+        # ⏱ v84_499: o texto fica na tela o tempo de LER (antes ficava só o tempo da palavra ser falada: piscava)
+        fim = max(fim, ini + tempo_de_leitura(d.get("texto") or ""))
         if duracao:
             fim = min(fim, duracao)
             ini = min(ini, max(0.0, fim - 0.6))
