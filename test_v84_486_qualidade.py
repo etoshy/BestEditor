@@ -223,3 +223,62 @@ def test_v84_503_livros_mencao_e_botao():
     src = open(os.path.join(base, "templates", "dossie_detalhe.html"), encoding="utf-8").read()
     assert "📍 no roteiro" in src and "no roteiro (a IA acha o melhor lugar)" in src and "gere a 🎙 voz de novo" in src
     assert 'x["mencao"]' in open(la.__file__, encoding="utf-8").read()
+
+
+def _proj_livros():
+    rot = ("Abertura forte sobre pensar direito. " * 20 + "\n\n" +
+           "Um argumento tem premissas e conclusão. Saber separar as duas é o começo de tudo.\n\n"
+           "A falácia é um erro de raciocínio que parece certo. Ela engana porque soa bem.\n\n"
+           "Por hoje é isso. As fontes estão na descrição.")
+    return {"tema": "lógica", "resultado": {"roteiro": rot, "livros": {"escolhidos": [
+        {"titulo": "Como Ler um Livro", "titulo_curto": "Como Ler um Livro", "autor": "Mortimer J. Adler", "capa": "I1", "link": "x"},
+        {"titulo": "Introdução à Lógica: 3ª edição", "titulo_curto": "Introdução à Lógica", "autor": "Irving M. Copi", "capa": "I2", "link": "y"}]}}}
+
+
+def test_v84_504_livro_que_ficou_de_fora_ganha_segunda_chamada():
+    import os, sys
+    base = os.path.dirname(os.path.abspath(__file__))
+    sys.path.insert(0, base); sys.path.insert(0, os.path.join(base, "toolkit"))
+    import livros_afiliado as la
+    p = _proj_livros()
+    chamadas = []
+
+    def fake(rec, system, conteudo, **kw):
+        chamadas.append(conteudo)
+        if len(chamadas) == 1:  # 1ª: o 2º livro vai na ABERTURA (é descartado) — só o 1º entra
+            return {"trocas": [
+                {"de": "Saber separar as duas é o começo de tudo.", "livro": "Como Ler um Livro",
+                 "para": "Saber separar as duas é o começo de tudo. [I1] Isso está em ‘Como Ler um Livro’, do Adler."},
+                {"de": "Abertura forte sobre pensar direito.", "livro": "Introdução à Lógica",
+                 "para": "Abertura forte sobre pensar direito. [I2] Tem ‘Introdução à Lógica’, do Copi."}]}
+        assert "Introdução à Lógica" in conteudo and "JÁ CITADOS" in conteudo and "Abertura forte" not in conteudo
+        return {"trocas": [{"de": "Ela engana porque soa bem.", "livro": "Introdução à Lógica",
+                            "para": "Ela engana porque soa bem. [I2] Pra ir mais fundo, tem ‘Introdução à Lógica’, do Copi."}]}
+    novo = la.adaptar(p, chamar=fake)
+    assert len(chamadas) == 2
+    lv = p["resultado"]["livros"]
+    assert all(x.get("mencao") for x in lv["escolhidos"]) and lv["faltando"] == []
+    assert "Copi" in lv["escolhidos"][1]["mencao"] and novo.index("Introdução à Lógica") > novo.index("Adler")
+    assert not novo.startswith("Abertura forte sobre pensar direito. [I2]")
+
+
+def test_v84_504_encaixar_so_o_que_falta():
+    import os, sys
+    base = os.path.dirname(os.path.abspath(__file__))
+    sys.path.insert(0, base); sys.path.insert(0, os.path.join(base, "toolkit"))
+    import livros_afiliado as la
+    p = _proj_livros()
+    r = p["resultado"]
+    r["roteiro_sem_livros"] = r["roteiro"]
+    r["roteiro_com_livros"] = r["roteiro"].replace("o começo de tudo.", "o começo de tudo. [I1] Está em ‘Como Ler um Livro’.")
+    r["livros"]["ativo"] = True
+    lv = la.estado(p)
+    assert lv["escolhidos"][0].get("mencao") and not lv["escolhidos"][1].get("mencao")
+
+    def fake(rec, system, conteudo, **kw):
+        assert "Como Ler um Livro" not in conteudo.split("ROTEIRO")[0].split("JÁ CITADOS")[0]
+        return {"trocas": [{"de": "Ela engana porque soa bem.", "livro": "Introdução à Lógica",
+                            "para": "Ela engana porque soa bem. [I2] Tem ‘Introdução à Lógica’, do Copi."}]}
+    novo = la.encaixar_faltando(p, chamar=fake)
+    assert "‘Como Ler um Livro’" in novo and "Introdução à Lógica" in novo
+    assert all(x.get("mencao") for x in lv["escolhidos"])

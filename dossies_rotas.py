@@ -148,6 +148,16 @@ def registrar(app, base_dir: str) -> None:
             ds.marcar_mudanca(p, "📖 livros no roteiro", ", ".join(x["titulo_curto"] for x in la.estado(p)["escolhidos"]))
         return _livros_acao(pid, f)
 
+    @app.route("/modelos-video/<pid>/livros/faltam", methods=["POST"])
+    def dossie_livros_faltam(pid: str):
+        """➕ Encaixa SÓ os livros que ainda não aparecem no roteiro (os que já estão ficam onde estão)."""
+        def f(p, la):
+            novo = la.encaixar_faltando(p)
+            p["resultado"] = ds.roteiro_editado(p, novo)
+            la.estado(p)["ativo"] = True
+            ds.marcar_mudanca(p, "📖 livro que faltava no roteiro")
+        return _livros_acao(pid, f)
+
     @app.route("/modelos-video/<pid>/livros/versao", methods=["POST"])
     def dossie_livros_versao(pid: str):
         """🔁 Alterna entre o roteiro COM livros e o SEM livros (gere a voz de novo depois)."""
@@ -187,6 +197,12 @@ def registrar(app, base_dir: str) -> None:
                 item["transcricao"] = mt.resumo(cam)
             out["midias"].append(item)
         if p.get("resultado"):
+            if (p["resultado"].get("livros") or {}).get("escolhidos"):
+                try:  # 📍 v84_504: onde cada livro está no roteiro (calcula pelo texto — vale pra projeto antigo)
+                    import livros_afiliado as _la
+                    _la.estado(p)
+                except Exception:  # noqa: BLE001
+                    pass
             out["descricao_pronta"] = ds.descricao_completa(p)
             import livros_afiliado
             out["comentario_livros"] = livros_afiliado.comentario_fixado(p["resultado"])

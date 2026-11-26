@@ -38,6 +38,8 @@ def estado(p: Dict[str, Any]) -> Dict[str, Any]:
     for x in lv["escolhidos"]:  # 🧹 v84_503: livros antigos com o "byline" sujo da Amazon ("Edição Português por …")
         if isinstance(x, dict) and x.get("autor") and re.search(r"Edi[çc][ãa]o|&amp;|\bpor\b|\(|mais\b", str(x["autor"]), re.I):
             x["autor"] = limpar_autor(x["autor"])
+    if res.get("roteiro_com_livros") and lv["escolhidos"]:  # 📍 v84_504: onde cada livro está (vale pra projeto antigo)
+        marcar_mencoes(lv, str(res["roteiro_com_livros"]))
     return lv
 
 
@@ -252,6 +254,105 @@ Regras — a menção tem que somar, nunca parecer anúncio:
 Responda SÓ o JSON: {"trocas": [{"de": "...", "para": "...", "livro": "título"}]}"""
 
 
+def _norm(t: Any) -> str:
+    import unicodedata as _ud
+    return re.sub(r"\s+", " ", _ud.normalize("NFKD", str(t or "").lower()).encode("ascii", "ignore").decode()
+                  .replace("‘", "'").replace("’", "'"))
+
+
+def _chave_titulo(x: Dict[str, Any]) -> str:
+    """O título como ele é FALADO: sem subtítulo (depois de ":" ou " - "), sem aspas, normalizado."""
+    t = limpar_titulo(x.get("titulo_curto") or x.get("titulo") or "")
+    t = re.split(r"\s*[:|–—]\s*|\s+-\s+", t)[0]
+    return re.sub(r"[^a-z0-9 ]+", " ", _norm(t)).strip()
+
+
+def achar_mencao(texto: str, x: Dict[str, Any]) -> str:
+    """📍 A frase do roteiro onde o livro é citado (pelo título falado; sem título, pelo sobrenome do autor + "livro")."""
+    chave = _chave_titulo(x)
+    if not chave:
+        return ""
+    frases = re.split(r"(?<=[.!?…])\s+|\n+", str(texto or ""))
+    for f in frases:
+        nf = " " + re.sub(r"[^a-z0-9 ]+", " ", _norm(f)) + " "
+        nf = re.sub(r"\s+", " ", nf)
+        if " " + chave + " " in nf:
+            if re.search(r"livros? (?:que eu )?cite", nf) and not re.search(r"livros? .*cite.*" + re.escape(chave), nf):
+                continue
+            return re.sub(r"\s+", " ", re.sub(r"\[[^\]]*\]", " ", f)).strip()[:400]
+    return ""
+
+
+def marcar_mencoes(lv: Dict[str, Any], texto: str) -> None:
+    for x in lv.get("escolhidos") or []:
+        if isinstance(x, dict):
+            m = achar_mencao(texto, x) if texto else ""
+            if m:
+                x["mencao"] = m
+            else:
+                x.pop("mencao", None)
+
+
+def _encaixar(texto: str, faltam: List[Dict[str, Any]], ja: List[Dict[str, Any]], chamar, p: Dict[str, Any]):
+    """Põe SÓ os livros que faltam no roteiro (que já pode ter outros livros). → (texto novo, nº de trechos não achados)."""
+    import ia_servico as ia
+    import revisao_roteiro as rv
+    from ia_midia import _S, _obj
+    corte = int(len(texto) * 0.15)
+    quebra = texto.find("\n", corte)
+    corte = quebra if 0 < quebra < corte + 600 else corte
+    cabeca, corpo = texto[:corte], texto[corte:]
+    lista = "\n".join(f"- “{x.get('titulo_curto') or x.get('titulo')}”{' — ' + limpar_autor(x['autor']) if x.get('autor') else ''}"
+                      f" · marca da capa: {'[' + x['capa'] + ']' if x.get('capa') else '(sem capa — não ponha marca)'}"
+                      f"{' · por que: ' + x['por_que'] if x.get('por_que') else ''}" for x in faltam)
+    jaf = "; ".join("“" + str(x.get("titulo_curto") or x.get("titulo")) + "” (" + (achar_mencao(texto, x)[:120]) + ")" for x in ja)
+    extra = (f"\n\nJÁ CITADOS (não mexa neles e cite o novo em OUTRA parte do vídeo, longe deles): {jaf}" if jaf else "")
+    schema = _obj({"trocas": {"type": "array", "items": _obj({"de": _S, "para": _S, "livro": _S})}})
+    with ia.rotulo("📖 Livro que faltou no roteiro: " + str(p.get("tema") or "")[:50]):
+        d = chamar("roteiros", SISTEMA_ADAPTAR + "\nIMPORTANTE: o roteiro abaixo JÁ começa depois da abertura — escolha "
+                   "qualquer ponto dele. Cite SÓ os livros da lista, um por troca, e NÃO repita a frase final dos livros se "
+                   "ela já existir.", f"LIVROS:\n{lista}{extra}\n\nROTEIRO (depois da abertura):\n{corpo}",
+                   schema=schema, max_tokens=3000, effort="medium", timeout=300, cache_local=False)
+    trocas = [t for t in (d or {}).get("trocas") or [] if isinstance(t, dict) and str(t.get("de") or "").strip()]
+    if not trocas:
+        raise LivroErro("A IA não devolveu onde citar o livro.")
+    r = rv.aplicar(corpo, json.dumps({"trocas": [{"de": t["de"], "para": t.get("para") or "", "motivo": "📖 livro"}
+                                                 for t in trocas]}, ensure_ascii=False))
+    return cabeca + r["texto"], len(r["nao_achadas"])
+
+
+def encaixar_faltando(p: Dict[str, Any], chamar=None) -> str:
+    """➕ Só os livros escolhidos que ainda NÃO aparecem no roteiro com livros (os que já estão ficam onde estão)."""
+    import ia_servico as ia
+    lv = estado(p)
+    res = p["resultado"]
+    texto = str(res.get("roteiro_com_livros") or "")
+    if not texto.strip():
+        return adaptar(p, chamar)
+    chamar = chamar or ia.chamar
+    if chamar is ia.chamar:
+        motivo = ia.motivo_desligado("roteiros")
+        if motivo:
+            raise LivroErro("IA: " + motivo)
+    livros = lv["escolhidos"]
+    faltam = [x for x in livros if not achar_mencao(texto, x)]
+    if not faltam:
+        marcar_mencoes(lv, texto)
+        raise LivroErro("Todos os livros já estão no roteiro.")
+    for _ in range(2):
+        try:
+            texto, _n = _encaixar(texto, faltam, [x for x in livros if x not in faltam], chamar, p)
+        except LivroErro:
+            pass
+        faltam = [x for x in livros if not achar_mencao(texto, x)]
+        if not faltam:
+            break
+    res["roteiro_com_livros"] = texto
+    marcar_mencoes(lv, texto)
+    lv["faltando"] = [x.get("titulo_curto") or x.get("titulo") for x in faltam]
+    return texto
+
+
 def _roteiro_base(p: Dict[str, Any]) -> str:
     """O roteiro SEM livros. 🔁 v84_492: se a versão em uso é a SEM livros, vale ela (pode ter recebido correções depois)."""
     res = p.get("resultado") or {}
@@ -291,35 +392,32 @@ def adaptar(p: Dict[str, Any], chamar=None) -> str:
         raise LivroErro("A IA não devolveu onde citar os livros (veja em 🤖 IA).")
     corte = int(len(base_rot) * 0.12)  # 📖 v84_491: nada de livro na abertura (a IA às vezes punha no 1º parágrafo)
     trocas = [t for t in trocas if not (0 <= base_rot.find(t["de"].strip()[:80]) < corte)] or trocas[:0]
-    if not trocas:
-        raise LivroErro("A IA só achou lugar pra citar o livro na abertura do vídeo (parece anúncio) — tente de novo.")
+    # (troca na abertura ou que não bateu: o livro fica "faltando" e a 2ª chamada abaixo encaixa ele depois da abertura)
     r = rv.aplicar(base_rot, json.dumps({"trocas": [{"de": t["de"], "para": t.get("para") or "", "motivo": "📖 livro"}
-                                                    for t in trocas]}, ensure_ascii=False))
-    if not r["aplicadas"]:
-        raise LivroErro("Os trechos que a IA escolheu não bateram com o roteiro — tente de novo.")
+                                                    for t in trocas]}, ensure_ascii=False)) if trocas else \
+        {"texto": base_rot, "aplicadas": [], "nao_achadas": []}
+    texto = r["texto"]
+    nao = len(r["nao_achadas"])
+    # 🩹 v84_504: confere no TEXTO FINAL se cada livro entrou; os que ficaram de fora (troca na abertura, trecho que não
+    # bateu, IA esqueceu) ganham uma 2ª chamada só pra eles, só com o roteiro depois da abertura
+    for _ in range(2):
+        faltam = [x for x in livros if not achar_mencao(texto, x)]
+        if not faltam:
+            break
+        try:
+            texto, n2 = _encaixar(texto, faltam, [x for x in livros if x not in faltam], chamar, p)
+            nao += n2
+        except LivroErro:
+            continue
+    if texto == base_rot:
+        raise LivroErro("A IA não conseguiu encaixar os livros no roteiro — tente de novo.")
     res["roteiro_sem_livros"] = base_rot
-    res["roteiro_com_livros"] = r["texto"]
-    # 📍 v84_503: ONDE cada livro entrou (pra página mostrar o trecho do roteiro)
-    import unicodedata as _ud
-
-    def _n(t):
-        return _ud.normalize("NFKD", str(t or "").lower()).encode("ascii", "ignore").decode()
-    aplicadas = {a["de"]: a for a in r["aplicadas"]}
-    for x in livros:
-        x.pop("mencao", None)
-        tit = _n(x.get("titulo_curto") or x.get("titulo"))
-        for t in trocas:
-            if t["de"][:200] not in aplicadas:
-                continue
-            if tit and (tit in _n(t.get("livro")) or _n(t.get("livro")) in tit or tit in _n(t.get("para"))):
-                novo = str(t.get("para") or "")
-                velho = str(t.get("de") or "")
-                extra = novo.replace(velho, " … ").strip() if velho and velho in novo else novo
-                x["mencao"] = re.sub(r"\s+", " ", re.sub(r"\[[^\]]*\]", " ", extra)).strip()[:400]
-                break
+    res["roteiro_com_livros"] = texto
+    marcar_mencoes(lv, texto)
     lv["adaptado_em"] = time.time()
-    lv["nao_achadas"] = len(r["nao_achadas"])
-    return r["texto"]
+    lv["nao_achadas"] = nao
+    lv["faltando"] = [x.get("titulo_curto") or x.get("titulo") for x in livros if not x.get("mencao")]
+    return texto
 
 
 # ------------------------------------------------------------------ 4. descrição e comentário fixado

@@ -667,9 +667,9 @@ function livrosHtml(R) {
         <div style="flex:1;font-size:.84rem"><b>${esc(x.titulo_curto)}</b>${x.autor ? ' — ' + esc(x.autor) : ''}${x.preco ? ` <span class="ds-hint">${esc(x.preco)}</span>` : ''}${x.capa ? ` <span class="ds-id">${esc(x.capa)}</span>` : ' <span class="ds-hint">(sem capa)</span>'}
           <div class="ds-hint" style="word-break:break-all">${esc(x.link)}</div>
           ${L.ativo && x.mencao ? `<div style="margin-top:3px;padding:3px 6px;background:#ecfdf5;border-left:3px solid #10b981;font-size:.8rem;color:#065f46">📍 no roteiro: “${esc(x.mencao)}”</div>`
-            : (R.roteiro_com_livros && L.ativo ? '<div class="ds-hint" style="color:#b45309">📍 não achei a menção dele no roteiro — use 🔁 Refazer</div>'
+            : (R.roteiro_com_livros && L.ativo ? '<div class="ds-hint" style="color:#b45309">📍 esse ficou de fora do roteiro — clique em ➕ Encaixar o que faltou</div>'
             : '<div class="ds-hint" style="color:#b45309">📍 ainda não está no roteiro — clique em 📖 Pôr no roteiro abaixo</div>')}</div><button class="ds-mini ds-sec lvTirar" data-id="${esc(x.id)}" title="tirar">✕</button></div>`; }).join('')}
-      <div class="ds-row" style="margin-top:6px">${IA.roteiros ? `<button class="ds-mini" id="lvAdaptar" style="background:#4338ca;color:#fff;font-weight:700;padding:6px 14px" title="${R.roteiro_com_livros ? 'volta o roteiro pra versão SEM livros e cita os livros de novo (regras novas: nunca na abertura, sem inventar o que tem no livro, cada um num ponto)' : ''}">${R.roteiro_com_livros ? '🔁 Refazer: volta o roteiro sem livros e cita de novo' : '📖 Pôr ' + (esc_.length > 1 ? 'os livros' : 'o livro') + ' no roteiro (a IA acha o melhor lugar)'}</button>` : ''}
+      <div class="ds-row" style="margin-top:6px">${IA.roteiros ? `${R.roteiro_com_livros && L.ativo && esc_.some(x => !x.mencao) ? `<button class="ds-mini" id="lvFaltam" style="background:#059669;color:#fff;font-weight:700;padding:6px 14px">➕ Encaixar o que faltou (${esc_.filter(x => !x.mencao).length}) — os outros ficam onde estão</button> ` : ''}<button class="ds-mini" id="lvAdaptar" style="background:#4338ca;color:#fff;font-weight:700;padding:6px 14px" title="${R.roteiro_com_livros ? 'volta o roteiro pra versão SEM livros e cita os livros de novo (regras novas: nunca na abertura, sem inventar o que tem no livro, cada um num ponto)' : ''}">${R.roteiro_com_livros ? '🔁 Refazer: volta o roteiro sem livros e cita de novo' : '📖 Pôr ' + (esc_.length > 1 ? 'os livros' : 'o livro') + ' no roteiro (a IA acha o melhor lugar)'}</button>` : ''}
         ${tem2 ? `<span class="ds-hint">Versão em uso: <b>${L.ativo ? '📖 COM livros' : 'SEM livros'}</b></span><button class="ds-mini ds-sec" id="lvVersao" data-v="${L.ativo ? 'sem' : 'com'}">🔁 usar a versão ${L.ativo ? 'SEM' : 'COM'} livros</button>` : ''}</div>
       ${tem2 ? '<div class="ds-hint">Trocou de versão? Gere a voz de novo (as falas que não mudaram são reaproveitadas no multi voice).</div>' : ''}
       <div class="ds-row" style="margin-top:4px"><span class="ds-hint">Link do livro vai:</span><select id="lvDestino" style="width:auto;margin:0;padding:2px 6px;font-size:.82rem">${Object.entries(DESTINOS_LV).map(([k, v]) => `<option value="${k}" ${(L.destino || 'ambos') === k ? 'selected' : ''}>${v}</option>`).join('')}</select></div>
@@ -698,11 +698,20 @@ function ligarLivros(R) {
   document.querySelectorAll('.lvTirar').forEach(b => b.addEventListener('click', async () => { try { feito(await api(`/modelos-video/${PID}/livros/remover`, { id: b.dataset.id })); } catch (err) { erro(err); } }));
   if ($('lvAdaptar')) $('lvAdaptar').addEventListener('click', async (e) => { e.target.disabled = true;
     st(R.roteiro_com_livros ? '🔁 voltando o roteiro sem livros e citando de novo…' : '✍️ a IA está achando o melhor momento pra citar…');
-    try { feito(await api(`/modelos-video/${PID}/livros/adaptar`, {}));
+    try { const d_ = await api(`/modelos-video/${PID}/livros/adaptar`, {}); feito(d_);
+      const falt_ = ((d_.projeto.resultado || {}).livros || {}).faltando || [];
+      if (falt_.length) st(`<span class="ds-erro">⚠ ficou de fora: ${esc(falt_.join(', '))} — clique em ➕ Encaixar o que faltou</span>`);
       const alert_ = document.createElement('div'); alert_.className = 'ds-hint';
       alert_.style.cssText = 'margin:6px 0;padding:6px 8px;background:#fef3c7;border-left:3px solid #f59e0b;color:#78350f';
       alert_.innerHTML = '✔ Livros no roteiro (📍 mostra onde ficou cada um). <b>Agora gere a 🎙 voz de novo e remonte o vídeo</b> — a voz antiga não fala dos livros.';
       const box = $('lvAdaptar') ? $('lvAdaptar').parentNode : null; if (box) box.insertBefore(alert_, box.firstChild);
+    } catch (err) { erro(err); e.target.disabled = false; } });
+  if ($('lvFaltam')) $('lvFaltam').addEventListener('click', async (e) => { e.target.disabled = true;
+    st('➕ a IA está achando um lugar pro livro que faltou…');
+    try { const d = await api(`/modelos-video/${PID}/livros/faltam`, {}); feito(d);
+      const f = ((d.projeto.resultado || {}).livros || {}).faltando || [];
+      st(f.length ? `<span class="ds-erro">⚠ ainda ficou de fora: ${esc(f.join(', '))} — tente de novo</span>`
+                  : '<span class="ds-ok">✔ todos os livros no roteiro — gere a 🎙 voz de novo e remonte</span>');
     } catch (err) { erro(err); e.target.disabled = false; } });
   if ($('lvVersao')) $('lvVersao').addEventListener('click', async (e) => { try { feito(await api(`/modelos-video/${PID}/livros/versao`, { versao: e.target.dataset.v })); } catch (err) { erro(err); } });
   if ($('lvDestino')) $('lvDestino').addEventListener('change', async (e) => { try { feito(await api(`/modelos-video/${PID}/livros/destino`, { destino: e.target.value })); } catch (err) { erro(err); } });
