@@ -35,6 +35,9 @@ def estado(p: Dict[str, Any]) -> Dict[str, Any]:
     lv.setdefault("sugeridos", [])
     lv.setdefault("escolhidos", [])
     lv.setdefault("destino", "ambos")
+    for x in lv["escolhidos"]:  # 🧹 v84_503: livros antigos com o "byline" sujo da Amazon ("Edição Português por …")
+        if isinstance(x, dict) and x.get("autor") and re.search(r"Edi[çc][ãa]o|&amp;|\bpor\b|\(|mais\b", str(x["autor"]), re.I):
+            x["autor"] = limpar_autor(x["autor"])
     return lv
 
 
@@ -296,6 +299,24 @@ def adaptar(p: Dict[str, Any], chamar=None) -> str:
         raise LivroErro("Os trechos que a IA escolheu não bateram com o roteiro — tente de novo.")
     res["roteiro_sem_livros"] = base_rot
     res["roteiro_com_livros"] = r["texto"]
+    # 📍 v84_503: ONDE cada livro entrou (pra página mostrar o trecho do roteiro)
+    import unicodedata as _ud
+
+    def _n(t):
+        return _ud.normalize("NFKD", str(t or "").lower()).encode("ascii", "ignore").decode()
+    aplicadas = {a["de"]: a for a in r["aplicadas"]}
+    for x in livros:
+        x.pop("mencao", None)
+        tit = _n(x.get("titulo_curto") or x.get("titulo"))
+        for t in trocas:
+            if t["de"][:200] not in aplicadas:
+                continue
+            if tit and (tit in _n(t.get("livro")) or _n(t.get("livro")) in tit or tit in _n(t.get("para"))):
+                novo = str(t.get("para") or "")
+                velho = str(t.get("de") or "")
+                extra = novo.replace(velho, " … ").strip() if velho and velho in novo else novo
+                x["mencao"] = re.sub(r"\s+", " ", re.sub(r"\[[^\]]*\]", " ", extra)).strip()[:400]
+                break
     lv["adaptado_em"] = time.time()
     lv["nao_achadas"] = len(r["nao_achadas"])
     return r["texto"]

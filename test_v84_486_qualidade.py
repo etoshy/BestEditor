@@ -212,3 +212,14 @@ def test_v501_status_dos_livros(monkeypatch):
     assert st[0]["no_roteiro"] and st[0]["falado_em"] == 30 and st[0]["trecho"] == 0 and st[0]["no_texto"] is False
     job["segments"][0]["text"] = "outra coisa"
     assert A.status_livros(job)[0]["falado_em"] is None
+
+
+def test_v84_503_livros_mencao_e_botao():
+    import os, sys
+    base = os.path.dirname(os.path.abspath(__file__))
+    sys.path.insert(0, base); sys.path.insert(0, os.path.join(base, "toolkit"))
+    import livros_afiliado as la
+    assert la.limpar_autor("por Fulano de Tal (Autor) &amp; mais").startswith("Fulano")
+    src = open(os.path.join(base, "templates", "dossie_detalhe.html"), encoding="utf-8").read()
+    assert "📍 no roteiro" in src and "no roteiro (a IA acha o melhor lugar)" in src and "gere a 🎙 voz de novo" in src
+    assert 'x["mencao"]' in open(la.__file__, encoding="utf-8").read()
