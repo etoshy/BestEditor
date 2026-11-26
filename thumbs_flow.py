@@ -87,6 +87,9 @@ def normalizar(x: Any) -> Optional[Dict[str, str]]:
         out["modo"] = "albert"
         out["texto"] = re.sub(r"[^\w-]", "", (texto or str(x.get("palavra") or "")).split()[0] if (texto or x.get("palavra")) else "",
                               flags=re.UNICODE).upper()[:14]
+    elif str(x.get("modo") or x.get("estilo") or "").lower() in ("personagem", "mascote"):  # 🧑 v84_496
+        out["modo"] = "personagem"
+        out["texto"] = " ".join(texto.upper().split())[:30]
     import metodo_roteiro as _mr
     tits = [_mr.aspas_duplas(" ".join(str(t).split())[:100]) for t in (x.get("titulos") or []) if str(t).strip()][:3]
     if tits:  # 🏷 v84_429: os títulos que combinam com ESTA thumbnail
@@ -196,9 +199,9 @@ def editar(base: str, origem: str, pid: str, n: int, **campos: Any) -> Dict[str,
             if "titulos" in campos:  # 🏷 v84_429
                 it["titulos"] = [" ".join(str(t).split())[:100] for t in (campos["titulos"] or []) if str(t).strip()][:3]
             if "modo" in campos:  # 🔥 v84_417: "albert" (palavra na imagem) ou "" (texto por cima, o de sempre)
-                it["modo"] = "albert" if campos["modo"] == "albert" else ""
+                it["modo"] = campos["modo"] if campos["modo"] in ("albert", "personagem") else ""
             if ("texto" in campos or "modo" in campos) and it.get("imagem") and os.path.isfile(it["imagem"]):  # refaz a final na hora
-                it["final"] = compor(it["imagem"], "" if it.get("modo") == "albert" else (it.get("texto") or ""),
+                it["final"] = compor(it["imagem"], "" if it.get("modo") in ("albert", "personagem") else (it.get("texto") or ""),
                                      it["imagem"].rsplit(".", 1)[0] + "_final.jpg")
         salvar(base, origem, pid, d)
         return d
@@ -227,6 +230,9 @@ def cor_fundo_de(it: Dict[str, Any]) -> str:
 
 def prompt_flow(it: Dict[str, Any], lado: str = "right", estilo: str = "") -> str:
     """A cena (prompt da IA, em inglês, ou a ideia) + o estilo de thumbnail (o do canal, quando tem — v84_368)."""
+    if it.get("modo") == "personagem":  # 🧑 v84_496: personagem da foto de referência + palavra amarela + fundo em perspectiva
+        import thumbs_personagem
+        return thumbs_personagem.prompt(it, com_referencia=bool(it.get("_tem_ref", True)))
     cena = (it.get("prompt") or it.get("ideia") or "").strip().rstrip(".,")
     if it.get("modo") == "albert":  # 👍 v84_452: o joinha em TODAS as thumbs — sai da cena (o gesto vem da própria cena)
         cena = re.sub(r"(?i),?\s*(and\s+|while\s+)?(giving|doing|making|flashing|with)\s+(a\s+|an\s+)?(big\s+|enthusiastic\s+|"
@@ -775,8 +781,17 @@ def gerar(base: str, origem: str, pid: str, ns: Optional[List[int]] = None, forc
         editar_status(base, origem, pid, n, status="gerando", erro="")
         log(f"🎨 thumbnail {k}/{len(alvo)}: {it.get('ideia', '')[:80]}")
         try:
-            pf = prompt_flow(it, estilo=est)
-            fotos = cliente.gerar_imagem_prompt(pf, forcar=forcar or bool(it.get("imagem")))
+            ref = ""
+            if it.get("modo") == "personagem":  # 🧑 v84_496: a foto de referência do personagem vai junto pro Flow
+                import thumbs_personagem
+                ref = thumbs_personagem.referencia(base, origem, pid)["arquivo"]
+                if not ref:
+                    log("⚠ thumbnail personagem sem foto de referência — vai sem (envie a foto em 🧑 Personagem)")
+            pf = prompt_flow(dict(it, _tem_ref=bool(ref)), estilo=est)
+            if ref and hasattr(cliente, "gerar_imagem_com_referencia"):
+                fotos = cliente.gerar_imagem_com_referencia(pf, ref, forcar=forcar or bool(it.get("imagem")))
+            else:
+                fotos = cliente.gerar_imagem_prompt(pf, forcar=forcar or bool(it.get("imagem")))
             origem_img = next((f.local_path for f in fotos if getattr(f, "local_path", "") and os.path.isfile(f.local_path)), None)
             if not origem_img:
                 raise ThumbErro("o Flow não devolveu a imagem")
@@ -784,7 +799,7 @@ def gerar(base: str, origem: str, pid: str, ns: Optional[List[int]] = None, forc
             os.makedirs(p, exist_ok=True)
             destino = os.path.join(p, f"thumb_{n}_{int(time.time() * 1000)}{os.path.splitext(origem_img)[1] or '.png'}")
             shutil.copyfile(origem_img, destino)
-            final = compor(destino, "" if it.get("modo") == "albert" else (it.get("texto") or ""),
+            final = compor(destino, "" if it.get("modo") in ("albert", "personagem") else (it.get("texto") or ""),
                            destino.rsplit(".", 1)[0] + "_final.jpg")  # 🔥 albert: a palavra já vem na imagem
             editar_status(base, origem, pid, n, status="pronto", imagem=destino, final=final, erro="", prompt_usado=pf)
             feitas += 1
@@ -835,6 +850,7 @@ def para_json(d: Dict[str, Any], url_base: str, estilo_canal: str = "") -> Dict[
         out.append(x)
     import estilos_arte
     return {"itens": out, "estilos": estilos_arte.opcoes(),
+            "personagem": d.get("_personagem_info") or {},
             "cores_fundo": dict({k: v[0] for k, v in CORES_FUNDO.items()}, livre="🎨 a do estilo (sem forçar)")}
 
 

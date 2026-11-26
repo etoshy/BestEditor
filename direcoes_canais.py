@@ -299,6 +299,18 @@ RACIOCINIO_MALDITO: Dict[str, Any] = {
     "editoriais": {"ativo": True, "densidade": "minimal", "tipos": ["reescrita", "numero", "nome", "titulo_video", "pagina"]},
     "som_transicoes": "nenhum",
     "sem_efeito_sonoro": True,
+    "guia": ("1) A IDEIA é a estrela: a edição nunca compete com a voz — nada de efeito chamativo, glitch, flash, tremida, "
+             "zoom rápido, contagem, emoji, setinha, \"whoosh\" ou texto pipocando.\n"
+             "2) Cada plano fica 5–7 s com a câmera respirando devagar (zoom_respiro / ken_burns_doc); corte seco na maioria "
+             "das emendas; fade pro preto só nas VIRADAS de assunto (início de capítulo, a grande pergunta, o fechamento).\n"
+             "3) Imagem escura e limpa: um filtro sóbrio pro vídeo todo (documentary/matte/noir_soft), vinheta leve; nada de "
+             "cor estourada.\n"
+             "4) Texto na tela RARO e com função: o NOME do conceito quando ele é definido (ex.: \"PRESSUPOSTO\"), a pergunta "
+             "central do vídeo, um número que a fala diz. Fonte serifada/limpa, branco com acento vinho (#8E2C3A). No máximo 1 "
+             "destaque a cada ~40–60 s.\n"
+             "5) Quadros editoriais só pra CITAÇÃO de autor/obra (reescrita) e definição curta; nada de mural, ficha, mapa.\n"
+             "6) Exemplos do dia a dia (\"imagine alguém que…\"): plano mais aberto e calmo, sem texto por cima.\n"
+             "7) Trecho do LIVRO citado: a capa em cartão sobre fundo, título e autor numa faixa discreta — não mexa."),
     "referencia": {"estilo": "ensaio narrado de psicologia (Raciocínio Maldito)", "plano_s": [5, 7]},
 }
 

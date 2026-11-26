@@ -21,6 +21,20 @@
   </div>
   <div id="thEstilosBox" style="margin-top:8px;font-size:.82rem;color:#334155"><b>🎨 Estilos de arte pras ideias novas</b> <span style="color:#666">(marque um ou mais: o 🤖 +5 ideias distribui as ideias entre eles; nenhum marcado = o estilo do canal)</span>
     <div id="thEstilos" style="display:flex;flex-wrap:wrap;gap:2px 12px;margin-top:3px"></div></div>
+  <!-- 🧑 v84_496: estilo PERSONAGEM — o personagem da foto de referência (rosto + roupa completa) na cena -->
+  <div id="thPersBox" style="margin-top:8px;padding:8px 10px;border:1px solid #fde68a;background:#fffbeb;border-radius:8px;font-size:.82rem;color:#334155;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+    <img id="thPersImg" alt="" style="display:none;height:64px;width:64px;object-fit:cover;border-radius:6px;border:1px solid #e5e7eb">
+    <div style="flex:1;min-width:220px"><b>🧑 Estilo personagem</b> <span style="color:#666">(o personagem grande na cena com um objeto-símbolo, a palavra amarela no alto e o fundo em perspectiva — como as thumbs dos canais grandes)</span>
+      <div id="thPersSt" style="margin-top:2px;color:#555">sem foto do personagem ainda — envie uma: o rosto e a ROUPA COMPLETA dela entram em toda thumb desse estilo</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:4px">
+        <input type="file" id="thPersFoto" accept=".png,.jpg,.jpeg,.webp" style="width:auto;margin:0;font-size:.78rem">
+        <label style="margin:0;font-weight:400;display:inline-flex;gap:4px;align-items:center" title="marcado: a foto vira a PADRÃO do canal — os outros projetos desse canal já começam com ela"><input type="checkbox" id="thPersPadrao" style="width:auto;margin:0" checked> salvar como padrão do canal</label>
+        <button type="button" id="thPersVoltar" style="display:none;width:auto;margin:0;padding:2px 8px;font-size:.76rem;background:#64748b" title="este projeto volta a usar a foto padrão do canal">↩ usar a padrão do canal</button>
+        <button type="button" id="thPersFixar" style="display:none;width:auto;margin:0;padding:2px 8px;font-size:.76rem;background:#64748b" title="a foto deste projeto vira a padrão do canal">📌 tornar esta a padrão</button>
+      </div></div>
+    <label style="margin:0;font-weight:400;display:inline-flex;gap:4px;align-items:center" title="quantas thumbs no estilo personagem"><input type="number" id="thPersN" min="1" max="4" value="3" style="width:46px;margin:0;padding:2px"></label>
+    <button type="button" id="thSoPers" style="width:auto;margin:0;padding:5px 12px;background:#b45309;color:#fff">🧑 Thumbs com personagem</button>
+  </div>
   <div id="thLista" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;margin-top:10px;"></div>
 </div>
 <script>
@@ -44,7 +58,7 @@
     L.innerHTML = itens.map(it => `<div style="border:1px solid #e5e7eb;border-radius:8px;padding:8px;" data-n="${it.n}">
       ${it.url_final ? `<a href="${it.url_final}" target="_blank"><img src="${it.url_final}" style="width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:6px;"></a>` :
         `<div style="box-sizing:border-box;width:100%;aspect-ratio:16/9;background:#f1f5f9;border-radius:6px;display:flex;align-items:center;justify-content:center;color:#64748b;font-size:.85rem;text-align:center;padding:8px">${esc(ST[it.status] || 'sem imagem')}</div>`}
-      <div style="font-size:.8rem;color:#475569;margin:6px 0">${it.modo === 'albert' ? '<span style="background:#dc2626;color:#fff;border-radius:999px;padding:0 7px;font-size:.72rem;font-weight:700" title="palavra gigante atrás do personagem + uma ironia — o Flow escreve a palavra na imagem">🔥 palavra gigante</span> ' : ''}${esc(it.ideia)}${it.repetida ? ` <span style="display:inline-block;background:#fef3c7;color:#92400e;border-radius:999px;padding:0 7px;font-size:.7rem" title="a palavra ou a cena já saiu num OUTRO vídeo do canal — melhor trocar (🤖 +ideias cria outras sem repetir)">🔁 parecida com outro vídeo</span>` : ''}${it.modelo_ia ? ` <span style="display:inline-block;background:#f1f5f9;color:#475569;border-radius:999px;padding:0 7px;font-size:.7rem" title="o modelo que criou esta ideia (palavra, cena e prompt)">🤖 ${esc(it.modelo_ia)}</span>` : ''}</div>
+      <div style="font-size:.8rem;color:#475569;margin:6px 0">${it.modo === 'albert' ? '<span style="background:#dc2626;color:#fff;border-radius:999px;padding:0 7px;font-size:.72rem;font-weight:700" title="palavra gigante atrás do personagem + uma ironia — o Flow escreve a palavra na imagem">🔥 palavra gigante</span> ' : ''}${it.modo === 'personagem' ? '<span style="background:#b45309;color:#fff;border-radius:999px;padding:0 7px;font-size:.72rem;font-weight:700" title="o personagem da foto de referência (rosto + roupa) na cena, a palavra amarela escrita na imagem e o fundo em perspectiva">🧑 personagem</span> ' : ''}${esc(it.ideia)}${it.repetida ? ` <span style="display:inline-block;background:#fef3c7;color:#92400e;border-radius:999px;padding:0 7px;font-size:.7rem" title="a palavra ou a cena já saiu num OUTRO vídeo do canal — melhor trocar (🤖 +ideias cria outras sem repetir)">🔁 parecida com outro vídeo</span>` : ''}${it.modelo_ia ? ` <span style="display:inline-block;background:#f1f5f9;color:#475569;border-radius:999px;padding:0 7px;font-size:.7rem" title="o modelo que criou esta ideia (palavra, cena e prompt)">🤖 ${esc(it.modelo_ia)}</span>` : ''}</div>
       <label style="font-size:.78rem;margin:0">🎨 Estilo</label><select class="thEstilo" style="margin:2px 0 4px;font-size:.8rem;padding:3px"><option value="">🎨 o do canal</option>${ESTILOS.map(([k, nome]) => `<option value="${k}" ${it.estilo_arte === k ? 'selected' : ''}>${esc(nome)}</option>`).join('')}</select>
       <label style="font-size:.78rem;margin:0">${it.modo === 'albert' ? 'Palavra gigante (o Flow escreve na imagem)' : 'Texto na thumb'}</label><input type="text" class="thTexto" maxlength="40" value="${esc(it.texto)}" style="margin:2px 0 4px;">
       <label style="font-size:.76rem;margin:0 0 4px;font-weight:400;display:flex;gap:4px;align-items:center" title="ligado: a palavra vai DENTRO da imagem, atrás do personagem (gere de novo depois de mudar). Desligado: o texto entra por cima, do jeito de sempre — use se o Flow errar as letras"><input type="checkbox" class="thModo" style="width:auto;margin:0" ${it.modo === 'albert' ? 'checked' : ''}> 🔥 palavra gigante atrás do personagem</label>
@@ -87,7 +101,7 @@
     });
   }
   async function carregar() {
-    try { const r = await fetch(BASE, { cache: 'no-store' }); const d = await r.json(); if (!r.ok) throw new Error(d.erro || r.status); itens = d.itens || []; ESTILOS = d.estilos || ESTILOS; CORES = d.cores_fundo || CORES; desenharEstilos(); desenhar();
+    try { const r = await fetch(BASE, { cache: 'no-store' }); const d = await r.json(); if (!r.ok) throw new Error(d.erro || r.status); itens = d.itens || []; ESTILOS = d.estilos || ESTILOS; CORES = d.cores_fundo || CORES; desenharEstilos(); desenhar(); if (d.personagem) mostrarPers(d.personagem);
       const andando = itens.some(i => ['fila', 'gerando'].includes(i.status));
       clearTimeout(timer); if (andando) timer = setTimeout(carregar, 4000);
     } catch (e) { $h('thSt').textContent = '⚠ ' + e.message; }
@@ -112,6 +126,32 @@
     const b = $h('thSoAlbert'); b.disabled = true; const q = Number($h('thAlbertN').value || 3) || 3;
     $h('thSt').textContent = `🔥 a IA está criando ${q} thumbnails de palavra gigante…`;
     try { const d = await post(BASE + '/ia', { n: 0, albert: q, estilos: lerMarcados(), estilo_albert: $h('thAlbertEstilo').value, modelo: $h('thModelo').value, nao_repetir: $h('thNaoRepetir').checked }); itens = d.itens; desenhar(); $h('thSt').textContent = `✅ ${d.novas} ideia(s) nova(s) 🔥`; }
+    catch (e) { $h('thSt').textContent = '⚠ ' + e.message; } finally { b.disabled = false; }
+  });
+  // 🧑 v84_496: a foto do personagem (deste projeto ou a padrão do canal)
+  function mostrarPers(p) {
+    p = p || {}; const img = $h('thPersImg');
+    img.style.display = p.tem ? '' : 'none'; if (p.tem) img.src = p.url;
+    $h('thPersSt').textContent = p.tem ? (p.de === 'canal' ? `✔ usando a foto PADRÃO do canal (${p.canal}) — troque abaixo só pra este projeto, se quiser` : '✔ usando a foto DESTE projeto')
+      : 'sem foto do personagem ainda — envie uma: o rosto e a ROUPA COMPLETA dela entram em toda thumb desse estilo';
+    $h('thPersVoltar').style.display = p.de === 'projeto' ? '' : 'none';
+    $h('thPersFixar').style.display = p.de === 'projeto' ? '' : 'none';
+  }
+  window.thMostrarPers = mostrarPers;
+  $h('thPersFoto').addEventListener('change', async (e) => {
+    const f = e.target.files[0]; if (!f) return;
+    const fd = new FormData(); fd.append('foto', f); fd.append('padrao', $h('thPersPadrao').checked ? '1' : '0');
+    $h('thPersSt').textContent = '⏳ enviando…';
+    try { const r = await fetch(BASE + '/personagem', { method: 'POST', body: fd }); const d = await r.json(); if (!r.ok || d.erro) throw new Error(d.erro || r.status); mostrarPers(d.personagem); }
+    catch (er) { $h('thPersSt').textContent = '⚠ ' + er.message; } finally { e.target.value = ''; }
+  });
+  const acaoPers = (acao) => post(BASE + '/personagem', { acao }).then(d => mostrarPers(d.personagem)).catch(er => { $h('thPersSt').textContent = '⚠ ' + er.message; });
+  $h('thPersVoltar').addEventListener('click', () => acaoPers('usar_padrao'));
+  $h('thPersFixar').addEventListener('click', () => acaoPers('tornar_padrao'));
+  $h('thSoPers').addEventListener('click', async () => {
+    const b = $h('thSoPers'); b.disabled = true; const q = Number($h('thPersN').value || 3) || 3;
+    $h('thSt').textContent = `🧑 a IA está criando ${q} thumbnails com o personagem…`;
+    try { const d = await post(BASE + '/ia', { n: 0, personagem: q, modelo: $h('thModelo').value, nao_repetir: $h('thNaoRepetir').checked }); itens = d.itens; desenhar(); if (d.personagem) mostrarPers(d.personagem); $h('thSt').textContent = `✅ ${d.novas} ideia(s) nova(s) 🧑 — clique em 🎨 Gerar as que faltam`; }
     catch (e) { $h('thSt').textContent = '⚠ ' + e.message; } finally { b.disabled = false; }
   });
   $h('thIA').addEventListener('click', async () => {

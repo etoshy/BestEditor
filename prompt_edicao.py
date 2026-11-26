@@ -220,6 +220,11 @@ def montar_prompt(job: Dict[str, Any], estado: Dict[str, Any]) -> str:
     L.append(f"\n## Direção escolhida: {p.get('nome')} [{did}] · ritmo {ritmo}")
     if p.get("descricao"):
         L.append(p["descricao"])
+    if p.get("guia"):  # 🎬 v84_497: a estética do canal em regras (pra IA não fazer uma edição genérica)
+        L.append("ESTÉTICA DO CANAL (siga à risca — é o que diferencia esta direção de uma edição genérica):\n" + str(p["guia"]))
+    sem_som = p.get("sem_efeito_sonoro") or p.get("som_transicoes") == "nenhum"
+    if sem_som:
+        L.append("🔇 SEM EFEITO SONORO: não mande \"sons\", e em destaques/quadros/transições use \"som\": \"nenhum\" — a voz manda.")
     L.append("Respeite as porcentagens e os pesos (a % é de trechos/emendas que recebem o eixo; o resto fica sem):")
     for eixo, nome, rot in eixos:
         L.append(_linha_eixo(p, eixo, nome, rot, sistema))
@@ -288,8 +293,9 @@ def montar_prompt(job: Dict[str, Any], estado: Dict[str, Any]) -> str:
              + " | ".join(dp_graficos.ESQUEMAS) + ", \"cartao\" = " + " | ".join(dp_graficos.CARTOES)
              + ", \"fundo_cor\", \"fundo_opacidade\" 0–1, \"texto_cor\" e \"cor\" em cada item de \"dados\".")
     import dp_sons
-    L.append("Sons (opcional, campo \"sons\"; transições, destaques e quadros editoriais já ganham som automático): "
-             + "; ".join(f"{c['nome']}: " + ", ".join(x["id"] for x in c["sons"]) for c in dp_sons.categorias()))
+    if not sem_som:
+        L.append("Sons (opcional, campo \"sons\"; transições, destaques e quadros editoriais já ganham som automático): "
+                 + "; ".join(f"{c['nome']}: " + ", ".join(x["id"] for x in c["sons"]) for c in dp_sons.categorias()))
     L.append("Gráficos (campo \"tipo\"): " + "; ".join(f"{k} = {v}" for k, v in dp_graficos.TIPOS.items())
              + ". Posições: " + ", ".join(dp_graficos.POSICOES))
     import dp_editorial
@@ -336,6 +342,9 @@ def montar_prompt(job: Dict[str, Any], estado: Dict[str, Any]) -> str:
             midia = f"⬛ SEM CENA — nenhuma mídia achada pra '{s.get('query', '')}' — COBRIR (regra 13)"
         elif ov.get("cartao"):
             midia = f"🃏 cartão de texto (nenhuma imagem boa pra '{s.get('query', '')}') — não ponha destaque nem quadro em cima; troque por uma mídia enviada se alguma combinar"
+        elif s.get("livro"):
+            midia = ("📖 CAPA DO LIVRO citado, em cartão sobre fundo — NÃO troque a mídia, as bordas nem ponha quadro por "
+                     "cima; no máximo um destaque discreto com o título")
         elif ov.get("source") == "local_file":
             bid = _id_da_biblioteca(job, ov)
             midia += f" (= bib:{bid}, já colocada)" if bid else " (arquivo escolhido pela pessoa — não troque)"

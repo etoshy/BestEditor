@@ -45,7 +45,47 @@ def registrar(app, base_dir: str) -> None:
         if ideias is None:
             return jsonify({"erro": "Projeto não encontrado."}), 404
         d = tf.sincronizar(base_dir, origem, pid, ideias)
-        return jsonify(dict(tf.para_json(d, _url(origem, pid), tf.estilo(base_dir, origem, pid)), ok=True))
+        return jsonify(dict(tf.para_json(d, _url(origem, pid), tf.estilo(base_dir, origem, pid)), ok=True,
+                            personagem=_info_personagem(origem, pid)))
+
+    # ------------------------------------------------------------------ 🧑 v84_496: o personagem das thumbs (foto de referência)
+    def _info_personagem(origem: str, pid: str) -> Dict[str, Any]:
+        import thumbs_personagem as tp
+        r = tp.referencia(base_dir, origem, pid)
+        return {"tem": bool(r["arquivo"]), "de": r["de"], "canal": r["canal"],
+                "url": f"{_url(origem, pid)}/personagem/foto?v={int(os.path.getmtime(r['arquivo']))}" if r["arquivo"] else ""}
+
+    @app.route("/thumbs/<origem>/<pid>/personagem", methods=["POST"])
+    def thumbs_personagem_enviar(origem: str, pid: str):
+        """A foto do personagem (rosto + roupa completa): deste projeto e, se marcado, a padrão do canal."""
+        import thumbs_personagem as tp
+        if origem not in tf.ORIGENS or _ideias(origem, pid) is None:
+            return jsonify({"erro": "Projeto não encontrado."}), 404
+        acao = request.form.get("acao") or (request.get_json(silent=True) or {}).get("acao") or ""
+        try:
+            if acao == "usar_padrao":
+                tp.usar_padrao(base_dir, origem, pid)
+            elif acao == "tornar_padrao":
+                tp.tornar_padrao(base_dir, origem, pid)
+            else:
+                f = request.files.get("foto")
+                if not f or not f.filename:
+                    return jsonify({"erro": "Escolha a imagem do personagem."}), 400
+                tp.salvar_referencia(base_dir, origem, pid, f.read(), f.filename, request.form.get("padrao", "1") == "1")
+        except tf.ThumbErro as exc:
+            return jsonify({"erro": str(exc)}), 400
+        return jsonify({"ok": True, "personagem": _info_personagem(origem, pid)})
+
+    @app.route("/thumbs/<origem>/<pid>/personagem/foto")
+    def thumbs_personagem_foto(origem: str, pid: str):
+        import thumbs_personagem as tp
+        from flask import send_file
+        if origem not in tf.ORIGENS:
+            return "", 404
+        r = tp.referencia(base_dir, origem, pid)
+        if not r["arquivo"]:
+            return "", 404
+        return send_file(r["arquivo"])
 
     @app.route("/thumbs/<origem>/<pid>/editar", methods=["POST"])
     def thumbs_editar(origem: str, pid: str):
@@ -91,6 +131,14 @@ def registrar(app, base_dir: str) -> None:
             titulo, sobre, idioma = _contexto(origem, pid)
             if not (titulo or sobre).strip():
                 raise tf.ThumbErro("Sem título nem roteiro pra IA se basear.")
+            per = max(0, min(4, int(c["personagem"]))) if str(c.get("personagem", "")).strip().isdigit() else 0
+            if per and n == 0 and not str(c.get("albert", "")).strip().isdigit():  # 🧑 v84_496: só personagem
+                import thumbs_personagem as tp
+                novas = tp.pedir_ideias(titulo, sobre, d.get("itens") or [], per, idioma, modelo=_modelo_pedido(c),
+                                        outros=tf.outras_thumbs(base_dir, origem, pid) if c.get("nao_repetir", True) else [])
+                d = tf.adicionar_ideias(base_dir, origem, pid, novas)
+                return jsonify(dict(tf.para_json(d, _url(origem, pid), tf.estilo(base_dir, origem, pid)), ok=True,
+                                    novas=len(novas), personagem=_info_personagem(origem, pid)))
             alb = max(0, min(4, int(c["albert"]))) if str(c.get("albert", "")).strip().isdigit() else tf.ativo_albert()
             if n == 0 and not alb:
                 alb = tf.N_ALBERT
@@ -99,6 +147,10 @@ def registrar(app, base_dir: str) -> None:
                                     estilo_albert="canal" if c.get("estilo_albert") == "canal" else "marcado",
                                     modelo=_modelo_pedido(c),
                                     outros=tf.outras_thumbs(base_dir, origem, pid) if c.get("nao_repetir", True) else [])
+            if per:  # 🧑 junto com as outras
+                import thumbs_personagem as tp
+                novas += tp.pedir_ideias(titulo, sobre, (d.get("itens") or []) + novas, per, idioma, modelo=_modelo_pedido(c),
+                                         outros=tf.outras_thumbs(base_dir, origem, pid) if c.get("nao_repetir", True) else [])
             d = tf.adicionar_ideias(base_dir, origem, pid, novas)
         except (tf.ThumbErro, ValueError) as exc:
             return jsonify({"erro": str(exc)}), 400

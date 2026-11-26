@@ -1143,6 +1143,8 @@ class VideoSegment:
         # (False/False/0.5) quando as chaves não existem.
         if self.aspect_fill != "black":
             data["aspect_fill"] = self.aspect_fill
+        if getattr(self, "livro", False):  # 📖 v84_497: trecho da capa do livro citado (edição padrão — a IA de edição não mexe)
+            data["livro"] = True
         if self.image_fade_in:
             data["image_fade_in"] = self.image_fade_in
         if self.image_fade_out:

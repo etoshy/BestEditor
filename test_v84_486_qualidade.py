@@ -134,3 +134,43 @@ def test_v495_capa_do_livro_no_fluxo_local(monkeypatch):
     assert A._forcar_capas_livro(job, segs) == 1
     assert segs[1]["provider"] == "material" and segs[1]["query"] == "I7" and segs[1]["aspect_fill"] == "cartao"
     assert segs[0]["provider"] == "anime_pexels"
+
+
+def test_v497_trecho_do_livro_editado_e_ia_sem_som(monkeypatch):
+    import app as A
+    import prompt_edicao as pe
+    p = {"resultado": {"livros": {"ativo": True, "escolhidos": [{"titulo_curto": "Como Ler um Livro", "autor": "Mortimer J. Adler", "capa": "I7"}]}}}
+    monkeypatch.setattr(A, "_projeto_do_job", lambda job: ("dossie", None, p, "material"))
+    job = {"segments": [{"start": 30, "end": 36, "text": "tem Como Ler um Livro do Adler"}], "pending_segments": [],
+           "total_duration": 60}
+    segs = [{"start": 28, "end": 34, "provider": "x", "query": "y"}]
+    A._forcar_capas_livro(job, segs)
+    assert segs[0]["livro"] and segs[0]["aspect_fill"] == "cartao"
+
+    class P:
+        segments, destaques, graficos = [], [], []
+    A._aplicar_extras_dp(job, P())
+    d = [x for x in job["destaques"] if x["origem"] == "livro"]
+    assert d and "Como Ler um Livro — Mortimer J. Adler" == d[0]["texto"]
+    pr = pe.montar_prompt({"pending_segments": [dict(segs[0], end=34)], "total_duration": 60},
+                          {"direcao": "sys_raciocinio_maldito", "segmentos": [dict(segs[0])]})
+    assert "SEM EFEITO SONORO" in pr and "ESTÉTICA DO CANAL" in pr and "CAPA DO LIVRO" in pr
+    assert "Sons (opcional" not in pr
+
+
+def test_v498_livro_em_projeto_antigo(monkeypatch):
+    import app as A
+    p = {"resultado": {"livros": {"ativo": True, "escolhidos": [{"titulo_curto": "Como Ler um Livro", "autor": "Adler", "capa": "I7"}]}}}
+    monkeypatch.setattr(A, "_projeto_do_job", lambda job: ("dossie", None, p, "material"))
+    monkeypatch.setattr(A, "_save_state", lambda jid: None)
+    usados = []
+    monkeypatch.setattr(A, "_aplicar_produto", lambda job, segs: usados.extend(segs) or len(segs))
+    job = {"segments": [{"start": 30, "end": 36, "text": "tem Como Ler um Livro do Adler"}],
+           "pending_segments": [{"start": 28, "end": 34, "provider": "anime", "query": "y",
+                                 "override_source": {"source": "local_file", "value": "/clip.mp4"}}],
+           "segment_previews": [{"x": 1}], "destaques": []}
+    assert A._livro_em_projeto_antigo("j", job) == 1
+    s = job["pending_segments"][0]
+    assert s["query"] == "I7" and s["aspect_fill"] == "cartao" and "override_source" not in s and usados == [s]
+    assert job["segment_previews"][0] == {} and any(d["origem"] == "livro" for d in job["destaques"])
+    assert A._livro_em_projeto_antigo("j", job) == 0  # uma vez só

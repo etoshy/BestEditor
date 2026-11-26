@@ -3785,14 +3785,16 @@ def _aplicar_cortes_do_projeto(job: dict) -> int:
     return n
 
 
-def _forcar_capas_livro(job: dict, segmentos: list) -> int:
+def _forcar_capas_livro(job: dict, segmentos: list, projeto: Optional[dict] = None) -> int:
     """📖 v84_495: a CAPA do livro citado entra SEMPRE no trecho em que a narração fala do livro — seja qual for o banco
     (anime pexels, pod, Flow…) e a direção. Edição padrão: 🪧 cartão sobre fundo (a capa inteira, em pé).
     Acha o trecho pelo título do livro na transcrição. → quantas capas entraram."""
-    pj = _projeto_do_job(job)
-    if not pj or pj[0] != "dossie":
-        return 0
-    p = pj[2]
+    if projeto is None:
+        pj = _projeto_do_job(job)
+        if not pj or pj[0] != "dossie":
+            return 0
+        projeto = pj[2]
+    p = projeto
     lv = ((p.get("resultado") or {}).get("livros") or {})
     if not lv.get("ativo"):
         return 0
@@ -3824,7 +3826,12 @@ def _forcar_capas_livro(job: dict, segmentos: list) -> int:
         for s in segmentos:
             g = (lambda k, d=None, s=s: s.get(k, d)) if isinstance(s, dict) else (lambda k, d=None, s=s: getattr(s, k, d))
             if float(g("start", 0) or 0) <= t < float(g("end", 0) or 0):
-                novo = {"provider": "material", "query": cid, "media_type": "image", "aspect_fill": "cartao"}
+                novo = {"provider": "material", "query": cid, "media_type": "image", "aspect_fill": "cartao", "livro": True,
+                        "transition": "fadeblack", "efeito": "zoom_respiro"}
+                job.setdefault("_livros_marcados", []).append({
+                    "start": float(g("start", 0) or 0), "end": float(g("end", 0) or 0),
+                    "texto": " — ".join(x for x in (livro.get("titulo_curto") or livro.get("titulo") or "",
+                                                     __import__("livros_afiliado").limpar_autor(livro.get("autor") or "")) if x)})
                 for k, v in novo.items():
                     if isinstance(s, dict):
                         s[k] = v
@@ -3832,6 +3839,40 @@ def _forcar_capas_livro(job: dict, segmentos: list) -> int:
                         setattr(s, k, v)
                 n += 1
                 break
+    return n
+
+
+def _livro_em_projeto_antigo(job_id: str, job: dict) -> int:
+    """📖 v84_498: vídeo que já estava montado (antes da edição padrão do livro) ou livro escolhido DEPOIS: ao abrir o
+    editor, o trecho do livro ganha a edição padrão sozinho (capa em cartão + faixa com título e autor). Uma vez por capa
+    — se você mexer no trecho depois, o site não desfaz."""
+    pj = _projeto_do_job(job)
+    if not pj or pj[0] != "dossie":
+        return 0
+    lv = ((pj[2].get("resultado") or {}).get("livros") or {})
+    if not lv.get("ativo"):
+        return 0
+    feitos = set(job.get("livros_aplicados") or [])
+    faltam = [x for x in lv.get("escolhidos") or [] if x.get("capa") and str(x["capa"]).upper() not in feitos]
+    segs = job.get("pending_segments") or []
+    if not faltam or not segs:
+        return 0
+    ja = {str(x.get("query") or "").upper() for x in segs if isinstance(x, dict) and x.get("livro")}
+    p2 = dict(pj[2], resultado=dict(pj[2].get("resultado") or {}, livros=dict(lv, escolhidos=[x for x in faltam
+                                                                                              if str(x["capa"]).upper() not in ja])))
+    n = _forcar_capas_livro(job, segs, projeto=p2)
+    if n:
+        alvo = [k for k, x in enumerate(segs) if isinstance(x, dict) and x.get("livro") and x.get("provider") == "material"
+                and str(x.get("query") or "").upper() in {str(y["capa"]).upper() for y in faltam}]
+        prev = job.get("segment_previews") or []
+        for k in alvo:  # a prévia/o clipe antigo do trecho sai: entra a capa
+            segs[k].pop("override_source", None)
+            if k < len(prev):
+                prev[k] = {}
+        _aplicar_produto(job, [segs[k] for k in alvo])
+        _destaques_livro(job)
+    job["livros_aplicados"] = sorted(feitos | {str(x["capa"]).upper() for x in faltam})
+    _save_state(job_id)
     return n
 
 
@@ -5891,6 +5932,22 @@ def _aplicar_extras_dp(job: dict, parsed) -> None:
         job["destaques"] = dp_destaques.ancorar(parsed.destaques, _palavras_da_narracao(job), job.get("total_duration"))
     else:
         job.setdefault("destaques", [])
+    _destaques_livro(job)
+
+
+def _destaques_livro(job: dict) -> None:
+    """📖 v84_497: o trecho do livro já sai EDITADO — capa em cartão (no _forcar_capas_livro) + o título e o autor numa
+    faixa discreta embaixo (edição padrão de "anúncio" de livro, com qualquer direção)."""
+    job.setdefault("destaques", [])
+    for lv in job.pop("_livros_marcados", None) or []:
+        if not lv.get("texto"):
+            continue
+        a, b = lv["start"] + 0.4, max(lv["start"] + 2.5, min(lv["end"] - 0.2, lv["start"] + 6.0))
+        if any(d.get("origem") == "livro" and abs(float(d.get("start") or 0) - a) < 1 for d in job["destaques"]):
+            continue
+        job["destaques"].append({"id": uuid.uuid4().hex[:8], "estilo": "doc_lower", "start": round(a, 2), "end": round(b, 2),
+                                 "texto": lv["texto"][:80], "campos": {}, "origem": "livro", "zona": "terco_inf"})
+    job["destaques"].sort(key=lambda d: float(d.get("start") or 0))
 
 
 def _destaques_do_form(job: dict, form) -> None:
@@ -6598,6 +6655,10 @@ def edit_segments_page(job_id: str):
     job = _JOBS.get(job_id)
     if not job or "pending_segments" not in job:
         return "Job não encontrado, ou ainda não tem segmentos pra editar.", 404
+    try:
+        _livro_em_projeto_antigo(job_id, job)
+    except Exception:  # noqa: BLE001 — sem isso o editor abre igual
+        pass
     # Estúdio (timeline arrastável) é o padrão; ?modo=classico abre o editor em
     # lista de sempre. A escolha fica num cookie pra os redirecionamentos (enviar
     # arquivo, overlay, corte...) voltarem pro mesmo editor.

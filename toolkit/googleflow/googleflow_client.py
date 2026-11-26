@@ -2451,6 +2451,30 @@ class GoogleFlowClient:
             descartar_do_cache(prompt_completo, "imagem", self.proporcao)
         return self.search_photos_all(prompt_completo)
 
+    def gerar_imagem_com_referencia(self, prompt_completo: str, referencia: str, forcar: bool = False) -> List[FlowPhoto]:
+        """🧑 v84_496: imagem com UMA foto de referência subida na caixa do Flow (ex.: o personagem das thumbs — rosto e
+        roupa). Só no modo direto (o modo agente não sobe referência: cai no pedido sem ela)."""
+        if not referencia or not os.path.isfile(referencia):
+            return self.gerar_imagem_prompt(prompt_completo, forcar)
+        with open(referencia, "rb") as f:
+            digest = hashlib.sha1(f.read()).hexdigest()
+        prompt = montar_prompt(com_estilo(prompt_completo, self.cfg), self.proporcao)
+        chave = chave_do_prompt(f"ref|{digest}|{prompt}")
+        if forcar:
+            descartar_chave(chave)
+        fotos = self._do_cache(chave)
+        if fotos:
+            return fotos
+        pedido = _Pedido(prompt, chave, self.timeout_geracao_s, dict(self.cfg), tipo="imagem", imagem=referencia)
+        _enviar(self._chave_sessao(), self.cfg, self._playwright_factory or _playwright_padrao, pedido)
+        pedido.pronto.wait()
+        if pedido.erro is not None:
+            raise pedido.erro
+        fotos = self._do_cache(chave)
+        if not fotos:
+            raise GoogleFlowError("O Google Flow não devolveu nenhuma imagem.")
+        return fotos
+
     def animar_imagem(self, caminho_imagem: str, prompt: str, modelo: str = "Omni 1.1 Flash",
                       resolucao: str = "720p", duracao: str = "4s", proporcao: str = "9:16",
                       forcar: bool = False) -> List[FlowVideo]:
@@ -2818,7 +2842,9 @@ def trabalho_direto(tipo: str, prompt: str, cfg: Dict[str, Any], opcoes: Optiona
         return {"tipo": "video", "tipo_video": "Elementos", "prompt": prompt, "modelo": str(cfg.get("flow_modelo_video") or ""),
                 "proporcao": proporcao_flow(cfg.get("flow_proporcao_video") or "") or prop_cfg}
     return {"tipo": "imagem", "prompt": prompt, "modelo": str(cfg.get("flow_modelo_imagem") or ""),
-            "proporcao": proporcao_flow(o.get("proporcao") or cfg.get("flow_proporcao_imagem") or "") or prop_cfg}
+            "proporcao": proporcao_flow(o.get("proporcao") or cfg.get("flow_proporcao_imagem") or "") or prop_cfg,
+            # 🧑 v84_496: imagem com foto de referência (o personagem das thumbs)
+            **({"referencia": {"arquivo": imagem, "media_id": media_id}} if imagem else {})}
 
 
 _PARAR = object()
