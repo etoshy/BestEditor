@@ -200,3 +200,15 @@ def test_v500_pares_json_viram_o_formulario():
         A.app.preprocess_request()
         assert request.form["seg_0_query"] == "x" and request.form["seg_1_start"] == "5"
         assert request.form["export_quality"] == "1080p" and "_pares" not in request.form
+
+
+def test_v501_status_dos_livros(monkeypatch):
+    import app as A
+    p = {"resultado": {"livros": {"ativo": True, "escolhidos": [{"titulo_curto": "Como Ler um Livro", "capa": "I7"}]}}}
+    monkeypatch.setattr(A, "_projeto_do_job", lambda job: ("dossie", None, p, "material"))
+    job = {"segments": [{"start": 30, "end": 36, "text": "tem Como Ler um Livro do Adler"}],
+           "pending_segments": [{"start": 28, "end": 34, "provider": "material", "query": "I7", "livro": True}]}
+    st = A.status_livros(job)
+    assert st[0]["no_roteiro"] and st[0]["falado_em"] == 30 and st[0]["trecho"] == 0
+    job["segments"][0]["text"] = "outra coisa"
+    assert A.status_livros(job)[0]["falado_em"] is None

@@ -3809,6 +3809,53 @@ def _aplicar_cortes_do_projeto(job: dict) -> int:
     return n
 
 
+def _fala_do_livro(job: dict, livro: dict) -> Optional[dict]:
+    """O pedaço da transcrição em que a narração fala o título do livro (≥ 60% das palavras), ou None."""
+    import unicodedata
+
+    def toks(t):
+        t = unicodedata.normalize("NFKD", str(t or "").lower()).encode("ascii", "ignore").decode()
+        return re.findall(r"[a-z0-9]+", t)
+    alvo = [w for w in toks(livro.get("titulo_curto") or livro.get("titulo")) if len(w) > 2][:8]
+    if not alvo:
+        return None
+    fala = [x for x in job.get("segments") or [] if isinstance(x, dict) and x.get("text")]
+    melhor, nota = None, 0.0
+    for juntar in (False, True):  # 1º a frase sozinha; se o título quebrou entre duas frases, as duas juntas
+        for k, f in enumerate(fala):
+            txt = f["text"] + (" " + fala[k + 1]["text"] if juntar and k + 1 < len(fala) else "")
+            janela = set(toks(txt))
+            sc = sum(1 for w in alvo if w in janela) / len(alvo)
+            if sc > nota:
+                melhor, nota = f, sc
+        if nota >= 0.6:
+            break
+    return melhor if melhor and nota >= 0.6 else None
+
+
+def status_livros(job: dict) -> List[Dict[str, Any]]:
+    """📖 v84_501: pro editor mostrar se o livro está no roteiro, se a narração fala dele e em que trecho a capa entrou."""
+    pj = _projeto_do_job(job)
+    if not pj or pj[0] != "dossie":
+        return []
+    lv = ((pj[2].get("resultado") or {}).get("livros") or {})
+    out = []
+    segs = job.get("pending_segments") or []
+    for livro in lv.get("escolhidos") or []:
+        cid = str(livro.get("capa") or "").upper()
+        f = _fala_do_livro(job, livro)
+        k = next((i for i, x in enumerate(segs) if isinstance(x, dict) and str(x.get("query") or "").upper() == cid
+                  and x.get("provider") in ("material", "produto") or (isinstance(x, dict) and x.get("livro")
+                                                                         and str(x.get("query") or "").upper() == cid)), None)
+        out.append({"titulo": livro.get("titulo_curto") or livro.get("titulo") or "livro", "capa": cid,
+                    "no_roteiro": bool(lv.get("ativo")), "falado_em": float(f["start"]) if f else None,
+                    "trecho": k, "trecho_inicio": float(segs[k]["start"]) if k is not None else None})
+    return out
+
+
+app.jinja_env.globals["status_livros"] = status_livros
+
+
 def _forcar_capas_livro(job: dict, segmentos: list, projeto: Optional[dict] = None) -> int:
     """📖 v84_495: a CAPA do livro citado entra SEMPRE no trecho em que a narração fala do livro — seja qual for o banco
     (anime pexels, pod, Flow…) e a direção. Edição padrão: 🪧 cartão sobre fundo (a capa inteira, em pé).
@@ -3822,29 +3869,11 @@ def _forcar_capas_livro(job: dict, segmentos: list, projeto: Optional[dict] = No
     lv = ((p.get("resultado") or {}).get("livros") or {})
     if not lv.get("ativo"):
         return 0
-    import unicodedata
-
-    def toks(t):
-        t = unicodedata.normalize("NFKD", str(t or "").lower()).encode("ascii", "ignore").decode()
-        return re.findall(r"[a-z0-9]+", t)
-    fala = [x for x in job.get("segments") or [] if isinstance(x, dict) and x.get("text")]
     n = 0
     for livro in lv.get("escolhidos") or []:
         cid = str(livro.get("capa") or "").upper()
-        alvo = [w for w in toks(livro.get("titulo_curto") or livro.get("titulo")) if len(w) > 2][:8]
-        if not cid or not alvo:
-            continue
-        melhor, nota = None, 0.0
-        for juntar in (False, True):  # 1º a frase sozinha; se o título quebrou entre duas frases, as duas juntas
-            for k, f in enumerate(fala):
-                txt = f["text"] + (" " + fala[k + 1]["text"] if juntar and k + 1 < len(fala) else "")
-                janela = set(toks(txt))
-                sc = sum(1 for w in alvo if w in janela) / len(alvo)
-                if sc > nota:
-                    melhor, nota = f, sc
-            if nota >= 0.6:
-                break
-        if not melhor or nota < 0.6:
+        melhor = _fala_do_livro(job, livro)
+        if not cid or not melhor:
             continue
         t = float(melhor.get("start") or 0) + 0.3
         for s in segmentos:

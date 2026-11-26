@@ -26,6 +26,17 @@
     <button type="button" id="pe-comparar" style="width:auto;margin:0;padding:6px 14px;background:#7e22ce;color:#fff;font-weight:700;border:0;border-radius:6px;cursor:pointer;" title="cada momento com foto/vídeo real: a real de um lado e a de IA do outro — escolha uma ou outra">🔀 Comparar real × IA</button>
     {% if _pe.encaixadas %}<button type="button" id="pe-desfazer" style="width:auto;margin:0;padding:5px 12px;background:#64748b;color:#fff;border:0;border-radius:6px;cursor:pointer;">↩ Voltar as cenas de antes</button>{% endif %}
   </div>
+  {% if _pe.tipo == 'dossie' %}{% set _lvs = status_livros(job) %}{% if _lvs %}
+  <div id="pe-livros" style="margin-top:8px;padding:6px 10px;background:#fffbeb;border:1px solid #fde68a;border-radius:6px;color:#78350f;font-size:.84rem;">
+    {% for l in _lvs %}<div>📖 <b>{{ l.titulo }}</b> —
+      {% if not l.no_roteiro %}⚠ o roteiro em uso é a versão <b>SEM livros</b> (no Modelo de vídeo, 📖 Livros → 🔁 usar a versão COM livros e gere a voz de novo)
+      {% elif l.falado_em is none %}⚠ a narração <b>não fala o título</b> do livro (a voz é de antes de adaptar o roteiro? gere a voz de novo)
+      {% else %}✔ no roteiro · ✔ falado em <a href="#" class="pe-ir" data-t="{{ l.falado_em }}">{{ '%d:%02d' % ((l.falado_em // 60)|int, (l.falado_em % 60)|int) }}</a>
+        {% if l.trecho is not none %} · ✔ capa no <a href="#" class="pe-ir" data-t="{{ l.trecho_inicio }}">trecho {{ l.trecho + 1 }}</a>{% else %} · ⚠ a capa ainda não entrou (abra o editor de novo ou arraste a capa {{ l.capa }} da biblioteca){% endif %}
+      {% endif %}</div>{% endfor %}
+  </div>
+  <script>document.querySelectorAll('.pe-ir').forEach(a => a.addEventListener('click', (e) => { e.preventDefault(); const t = +a.dataset.t; if (typeof seek === 'function') seek(t); }));</script>
+  {% endif %}{% endif %}
   <div style="font-size:.78rem;color:#7e22ce;margin-top:4px;">Em cada momento que o roteiro marcou ([I3] antes da frase), o trecho em que essa frase é falada troca a mídia pela foto/vídeo REAL do projeto (vídeo com o pedaço planejado). Por padrão só troca cena de IA (pod/Flow/Runpod), ⏳ pendente ou sem mídia — o que você escolheu à mão fica. As cenas de IA continuam guardadas: ↩ volta. Sem marcas? No Modelo de vídeo, 📸 → 📍 Posicionar.</div>
   {% elif _pe.tipo == 'curto' %}
   <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px;padding-top:8px;border-top:1px solid #e9d5ff;">
