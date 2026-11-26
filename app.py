@@ -289,6 +289,30 @@ def _relax_multipart_limits():
             pass
 
 
+@app.before_request
+def _expandir_pares_do_form():
+    """⚡ v84_500: o Estúdio manda os milhares de campos dos trechos (seg_0_start, seg_0_query… × 1.400 trechos) num campo
+    só, "_pares" (JSON [[nome, valor], …]) — criar 80 mil <input> na página travava o navegador ("Página sem resposta")
+    ao Salvar e ao Montar. Aqui ele volta a ser o formulário de sempre (as rotas não mudam)."""
+    if request.method != "POST" or "multipart/form-data" not in (request.content_type or "") and \
+            "application/x-www-form-urlencoded" not in (request.content_type or ""):
+        return None
+    try:
+        bruto = request.form.get("_pares")
+    except Exception:  # noqa: BLE001
+        return None
+    if not bruto:
+        return None
+    from werkzeug.datastructures import ImmutableMultiDict
+    try:
+        pares = [(str(k), "" if v is None else str(v)) for k, v in json.loads(bruto)]
+    except (ValueError, TypeError):
+        return None
+    resto = [(k, v) for k, vs in request.form.lists() if k != "_pares" for v in vs]
+    request.form = ImmutableMultiDict(pares + resto)
+    return None
+
+
 @app.errorhandler(413)
 def _upload_too_large(error):
     # Diagnóstico: imprime no console os valores efetivos no momento do

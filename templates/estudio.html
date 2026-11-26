@@ -4249,7 +4249,10 @@ if (gerandoTl2()) acompanharTl2();
 function montarForm(acao) {
   tirarCartoesOrfaos();
   const f = $('formMontar'); f.innerHTML = '';
-  const add = (n, v) => { if (v === undefined || v === null) return; const i = document.createElement('input'); i.type = 'hidden'; i.name = n; i.value = v; f.appendChild(i); };
+  // ⚡ v84_500: os campos vão num JSON só ("_pares") — 1 <input> em vez de ~60 por trecho (80 mil num vídeo longo
+  // travavam o navegador: "Página sem resposta"); o servidor expande de volta no formulário de sempre
+  const pares = [];
+  const add = (n, v) => { if (v === undefined || v === null) return; pares.push([n, String(v)]); };
   add('global_aspect_fill', $('gBordas').value); add('global_trim_start_frames', $('gTrim').value);
   add('global_cartao_fundo', JSON.stringify(cartaoFundo));
   add('global_transition_type', $('gTransicao').value); add('global_transition_duration', $('gTransDur').value);
@@ -4300,6 +4303,7 @@ function montarForm(acao) {
     add(p + 'text_slide_direction', st.slide_direction || ''); add(p + 'text_size', st.font_size || '');
     add(p + 'text_start_offset', st.start_offset != null ? st.start_offset : ''); add(p + 'text_end_offset', st.end_offset != null ? st.end_offset : '');
   });
+  const i = document.createElement('input'); i.type = 'hidden'; i.name = '_pares'; i.value = JSON.stringify(pares); f.appendChild(i);
   return f;
 }
 function tirarCartoesOrfaos() {  // 🃏 trocou a mídia de um trecho-cartão: a frase do cartão sai junto

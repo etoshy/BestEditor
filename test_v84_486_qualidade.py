@@ -187,3 +187,16 @@ def test_v499_sem_filtro_tempo_de_leitura_e_enumeracao():
     assert d[0]["end"] - d[0]["start"] >= 2.15
     pr = pe.montar_prompt({"pending_segments": [], "total_duration": 60}, {"direcao": "sys_raciocinio_maldito", "segmentos": []})
     assert "ENUMERAÇÃO = ÊNFASE" in pr and "Filtro de cor (UM pro vídeo todo): NÃO usar" in pr
+
+
+def test_v500_pares_json_viram_o_formulario():
+    import json as _j
+    import app as A
+    from flask import request
+    pares = [["seg_0_start", "0"], ["seg_0_query", "x"], ["seg_1_start", "5"]]
+    with A.app.test_request_context("/job/x/confirm", method="POST",
+                                    data={"_pares": _j.dumps(pares), "export_quality": "1080p"},
+                                    content_type="multipart/form-data"):
+        A.app.preprocess_request()
+        assert request.form["seg_0_query"] == "x" and request.form["seg_1_start"] == "5"
+        assert request.form["export_quality"] == "1080p" and "_pares" not in request.form
